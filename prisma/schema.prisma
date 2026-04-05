@@ -1,0 +1,419 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  PARTNER
+  ADMIN
+}
+
+enum PartnerStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum PartnerType {
+  PHARMACY
+  CLINIC
+  WELLNESS_CENTER
+  LAB
+}
+
+enum ProductType {
+  PHYSICAL
+  SERVICE
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PromotionType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_SHIPPING
+}
+
+enum PromotionStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  role          UserRole  @default(CUSTOMER)
+  phone         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts     Account[]
+  sessions     Session[]
+  orders       Order[]
+  reviews      Review[]
+  behaviorLogs BehaviorLog[]
+  partner      Partner?
+  addresses    Address[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Address {
+  id        String  @id @default(cuid())
+  userId    String
+  label     String?
+  line1     String
+  line2     String?
+  city      String
+  state     String
+  postcode  String
+  country   String  @default("MY")
+  latitude  Float?
+  longitude Float?
+  isDefault Boolean @default(false)
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@map("addresses")
+}
+
+model Partner {
+  id          String        @id @default(cuid())
+  userId      String        @unique
+  slug        String        @unique
+  name        String
+  type        PartnerType
+  status      PartnerStatus @default(PENDING)
+  description String?       @db.Text
+  logoUrl     String?
+  bannerUrl   String?
+  phone       String?
+  email       String?
+  website     String?
+
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  state        String
+  postcode     String
+  country      String  @default("MY")
+  latitude     Float
+  longitude    Float
+
+  stripeAccountId String?
+  operatingHours  Json?
+  tags            String[]
+  isVerified      Boolean   @default(false)
+  approvedAt      DateTime?
+  approvedBy      String?
+  rejectedReason  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user       User              @relation(fields: [userId], references: [id])
+  products   Product[]
+  services   Service[]
+  orders     Order[]
+  reviews    Review[]
+  promotions Promotion[]
+  analytics  PartnerAnalytic[]
+
+  @@map("partners")
+}
+
+model Category {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  slug     String  @unique
+  iconUrl  String?
+  parentId String?
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+  services Service[]
+
+  @@map("categories")
+}
+
+model Product {
+  id                   String   @id @default(cuid())
+  partnerId            String
+  categoryId           String?
+  name                 String
+  slug                 String
+  description          String?  @db.Text
+  images               String[]
+  price                Int
+  comparePrice         Int?
+  sku                  String?
+  stock                Int      @default(0)
+  isActive             Boolean  @default(true)
+  isFeatured           Boolean  @default(false)
+  tags                 String[]
+  brand                String?
+  requiresPrescription Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  partner        Partner         @relation(fields: [partnerId], references: [id])
+  category       Category?       @relation(fields: [categoryId], references: [id])
+  orderItems     OrderItem[]
+  promotionItems PromotionItem[]
+  reviews        Review[]
+
+  @@unique([partnerId, slug])
+  @@map("products")
+}
+
+model Service {
+  id              String   @id @default(cuid())
+  partnerId       String
+  categoryId      String?
+  name            String
+  slug            String
+  description     String?  @db.Text
+  images          String[]
+  price           Int
+  durationMinutes Int?
+  isActive        Boolean  @default(true)
+  isFeatured      Boolean  @default(false)
+  tags            String[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  partner    Partner     @relation(fields: [partnerId], references: [id])
+  category   Category?   @relation(fields: [categoryId], references: [id])
+  orderItems OrderItem[]
+
+  @@unique([partnerId, slug])
+  @@map("services")
+}
+
+model Order {
+  id            String        @id @default(cuid())
+  orderNumber   String        @unique
+  userId        String
+  partnerId     String
+  addressId     String?
+  status        OrderStatus   @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
+  subtotal      Int
+  discountAmount Int          @default(0)
+  deliveryFee   Int           @default(0)
+  tax           Int           @default(0)
+  total         Int
+
+  stripePaymentIntentId String? @unique
+  stripeSessionId       String? @unique
+
+  promotionId String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User                 @relation(fields: [userId], references: [id])
+  partner   Partner              @relation(fields: [partnerId], references: [id])
+  address   Address?             @relation(fields: [addressId], references: [id])
+  promotion Promotion?           @relation(fields: [promotionId], references: [id])
+  items     OrderItem[]
+  history   OrderStatusHistory[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String      @id @default(cuid())
+  orderId    String
+  productId  String?
+  serviceId  String?
+  quantity   Int
+  unitPrice  Int
+  totalPrice Int
+  itemType   ProductType
+
+  order   Order    @relation(fields: [orderId], references: [id])
+  product Product? @relation(fields: [productId], references: [id])
+  service Service? @relation(fields: [serviceId], references: [id])
+
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(cuid())
+  orderId   String
+  status    OrderStatus
+  note      String?
+  createdAt DateTime    @default(now())
+  createdBy String?
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("order_status_history")
+}
+
+model Promotion {
+  id            String          @id @default(cuid())
+  partnerId     String?
+  title         String
+  description   String?         @db.Text
+  bannerUrl     String?
+  type          PromotionType
+  status        PromotionStatus @default(DRAFT)
+  discountValue Int
+  minOrderValue Int?
+  maxDiscount   Int?
+  code          String?         @unique
+  usageLimit    Int?
+  usageCount    Int             @default(0)
+  startDate     DateTime
+  endDate       DateTime
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  partner Partner?        @relation(fields: [partnerId], references: [id])
+  items   PromotionItem[]
+  orders  Order[]
+
+  @@map("promotions")
+}
+
+model PromotionItem {
+  id          String @id @default(cuid())
+  promotionId String
+  productId   String
+
+  promotion Promotion @relation(fields: [promotionId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@map("promotion_items")
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  userId     String
+  partnerId  String
+  productId  String?
+  rating     Int
+  title      String?
+  body       String?  @db.Text
+  isVerified Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  partner Partner  @relation(fields: [partnerId], references: [id])
+  product Product? @relation(fields: [productId], references: [id])
+
+  @@map("reviews")
+}
+
+model BehaviorLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  sessionId  String?
+  eventType  String
+  entityType String
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId, eventType])
+  @@index([entityType, entityId])
+  @@map("behavior_logs")
+}
+
+model PartnerAnalytic {
+  id        String   @id @default(cuid())
+  partnerId String
+  date      DateTime @db.Date
+  views     Int      @default(0)
+  clicks    Int      @default(0)
+  orders    Int      @default(0)
+  revenue   Int      @default(0)
+  createdAt DateTime @default(now())
+
+  partner Partner @relation(fields: [partnerId], references: [id])
+
+  @@unique([partnerId, date])
+  @@map("partner_analytics")
+}
+
+model SiteConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@map("site_config")
+}
