@@ -21,6 +21,7 @@
     "@tanstack/react-query": "^5.69.0",
     "@uploadthing/react": "^7.3.0",
     "autoprefixer": "^10.4.27",
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -43,18 +44,19 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/leaflet": "^1.9.16",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.20",
     "eslint": "^9",
     "eslint-config-next": "15.2.4",
-    "prisma": "^6.6.0",
-    "tsx": "^4.19.3",
-    "typescript": "^5",
-    "tailwindcss": "^3.4.17",
     "postcss": "^8.4.47",
-    "autoprefixer": "^10.4.20"
+    "prisma": "^6.6.0",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.3",
+    "typescript": "^5"
   }
 }
