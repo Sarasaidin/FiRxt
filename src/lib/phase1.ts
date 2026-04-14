@@ -1,4 +1,6 @@
-export const PHASE1_PARTNER_TYPES = ["PHARMACY", "CLINIC"] as const;
+import { PartnerType } from "@prisma/client";
+
+export const PHASE1_PARTNER_TYPES: PartnerType[] = ["PHARMACY", "CLINIC"];
 
 export const PHASE1_TYPE_LABELS = {
   PHARMACY: "Pharmacy",
