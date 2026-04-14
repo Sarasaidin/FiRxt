@@ -3,9 +3,7 @@ import Link from "next/link";
 const categories = [
   { label: "Pharmacies", icon: "💊", href: "/search?type=PHARMACY" },
   { label: "Clinics", icon: "🏥", href: "/search?type=CLINIC" },
-  { label: "Wellness", icon: "🌿", href: "/search?type=WELLNESS_CENTER" },
-  { label: "Labs", icon: "🔬", href: "/search?type=LAB" },
-  { label: "Promotions", icon: "🏷️", href: "/promotions" },
+  { label: "Promotions", icon: "️🏷️", href: "/promotions" },
 ];
 
 export function HomeCategories() {

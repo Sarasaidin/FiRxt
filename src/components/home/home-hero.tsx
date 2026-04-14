@@ -25,11 +25,11 @@ export function HomeHero() {
     <div className="bg-teal-gradient border-b border-brand-teal/50 py-10 px-4">
       <div className="mx-auto max-w-3xl text-center">
         <h1 className="text-3xl font-bold text-brand-navy mb-2">
-          Your Health, <span className="text-brand-green">Delivered Smart</span>
+          Reserve & Pay <span className="text-brand-green">Online</span>, Collect In Store
         </h1>
+
         <p className="text-gray-600 mb-6">
-          Find trusted pharmacies and clinics near you. Shop health products and book
-          services — all in one place.
+          Find trusted clinics and pharmacies near you. Reserve products or services online, then collect or attend in person.
         </p>
 
         <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3 max-w-xl mx-auto">
@@ -38,7 +38,7 @@ export function HomeHero() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search pharmacies, products, services..."
+              placeholder="Search clinics, pharmacies, products, services..."
               className="flex-1 text-sm focus:outline-none text-gray-800 placeholder-gray-400"
             />
           </div>

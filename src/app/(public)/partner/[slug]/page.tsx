@@ -45,14 +45,7 @@ export default async function PartnerStorefrontPage({ params }: Props) {
 
   if (!partner) notFound();
 
-  const typeLabel =
-    partner.type === "PHARMACY"
-      ? "Community Pharmacy"
-      : partner.type === "CLINIC"
-      ? "Medical Clinic"
-      : partner.type === "WELLNESS_CENTER"
-      ? "Wellness Center"
-      : "Diagnostic Lab";
+  const typeLabel = partner.type === "PHARMACY" ? "Pharmacy" : "Clinic";
 
   return (
     <div>
@@ -106,7 +99,13 @@ export default async function PartnerStorefrontPage({ params }: Props) {
               </div>
             </div>
           </div>
-        </Card>
+          <Card className="p-4 mb-6">
+            <p className="text-sm text-gray-700">
+              {partner.type === "PHARMACY"
+                ? "Reserve and pay online, then collect your items in store."
+                : "Reserve and pay online, then attend your appointment at the clinic."}
+            </p>
+          </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Products & Services */}

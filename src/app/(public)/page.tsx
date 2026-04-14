@@ -1,16 +1,19 @@
-export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { PartnerCard } from "@/components/partner/partner-card";
 import { HomeHero } from "@/components/home/home-hero";
 import { HomeCategories } from "@/components/home/home-categories";
 import { FeaturedPromotions } from "@/components/promotions/featured-promotions";
+import { PHASE1_PARTNER_TYPES } from "@/lib/phase1";
 
 export const revalidate = 60;
 
 export default async function HomePage() {
   const [partners, promotions] = await Promise.all([
     prisma.partner.findMany({
-      where: { status: "APPROVED" },
+      where: {
+        status: "APPROVED",
+        type: { in: PHASE1_PARTNER_TYPES },
+      },
       orderBy: { createdAt: "desc" },
       take: 12,
       select: {
@@ -42,21 +45,20 @@ export default async function HomePage() {
     <div className="bg-teal-gradient min-h-screen">
       <HomeHero />
 
-      {/* Promotions */}
       {promotions.length > 0 && (
         <section className="mx-auto max-w-7xl px-4 py-6">
           <FeaturedPromotions promotions={promotions} />
         </section>
       )}
 
-      {/* Categories */}
       <HomeCategories />
 
-      {/* Partner Grid */}
       <section className="mx-auto max-w-7xl px-4 py-6">
         <div className="mb-4 flex items-center gap-2">
           <div className="w-1 h-5 bg-brand-green rounded-full" />
-          <h2 className="text-base font-semibold text-gray-800">All Partners</h2>
+          <h2 className="text-base font-semibold text-gray-800">
+            Clinics & Pharmacies
+          </h2>
         </div>
 
         {partners.length === 0 ? (
@@ -67,10 +69,7 @@ export default async function HomePage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {partners.map((partner) => (
-              <PartnerCard
-                key={partner.id}
-                {...partner}
-              />
+              <PartnerCard key={partner.id} {...partner} />
             ))}
           </div>
         )}

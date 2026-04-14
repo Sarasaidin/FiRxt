@@ -23,8 +23,6 @@ enum PartnerStatus {
 enum PartnerType {
   PHARMACY
   CLINIC
-  WELLNESS_CENTER
-  LAB
 }
 
 enum ProductType {
@@ -33,13 +31,18 @@ enum ProductType {
 }
 
 enum OrderStatus {
-  PENDING
-  CONFIRMED
-  PROCESSING
-  SHIPPED
-  DELIVERED
+  PENDING_PAYMENT
+  PAID
+  READY_FOR_COLLECTION
+  BOOKING_CONFIRMED
+  COMPLETED
   CANCELLED
   REFUNDED
+}
+
+enum FulfillmentType {
+  IN_STORE_PICKUP
+  IN_STORE_VISIT
 }
 
 enum PaymentStatus {
@@ -286,6 +289,10 @@ model Order {
   promotion Promotion?           @relation(fields: [promotionId], references: [id])
   items     OrderItem[]
   history   OrderStatusHistory[]
+
+  fulfillmentType FulfillmentType?
+  pickupAt DateTime?
+  visitAt DateTime?
 
   @@map("orders")
 }
