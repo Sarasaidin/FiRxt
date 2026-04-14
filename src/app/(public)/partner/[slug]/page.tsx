@@ -3,8 +3,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
+import { AddToCartButton } from "@/app/components/cart/add-to-cart-button";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -55,8 +55,8 @@ export default async function PartnerStorefrontPage({ params }: Props) {
 
       <div className="mx-auto max-w-7xl px-4 pb-10">
         {/* Profile card */}
-        <Card className="-mt-16 mb-6 p-6 relative z-10">
-          <div className="flex flex-col md:flex-row md:items-start gap-6">
+        <Card className="relative z-10 -mt-16 mb-6 p-6">
+          <div className="flex flex-col gap-6 md:flex-row md:items-start">
             <div className="relative h-24 w-24 overflow-hidden rounded-xl border bg-white">
               {partner.logoUrl ? (
                 <Image
@@ -77,11 +77,13 @@ export default async function PartnerStorefrontPage({ params }: Props) {
                 <h1 className="text-2xl font-bold text-brand-navy">
                   {partner.name}
                 </h1>
+
                 {partner.isVerified && (
                   <span className="rounded-full bg-brand-green/10 px-2 py-1 text-xs font-medium text-brand-green">
                     Verified
                   </span>
                 )}
+
                 <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">
                   {typeLabel}
                 </span>
@@ -132,7 +134,9 @@ export default async function PartnerStorefrontPage({ params }: Props) {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {partner.promotions.map((promo) => (
                 <Card key={promo.id} className="p-4">
-                  <h3 className="font-semibold text-brand-navy">{promo.title}</h3>
+                  <h3 className="font-semibold text-brand-navy">
+                    {promo.title}
+                  </h3>
                   {promo.description && (
                     <p className="mt-1 text-sm text-gray-600">
                       {promo.description}
@@ -196,7 +200,17 @@ export default async function PartnerStorefrontPage({ params }: Props) {
                         Stock: {product.stock}
                       </p>
 
-                      <Button className="mt-3 w-full">View / Reserve</Button>
+                      <AddToCartButton
+                        id={product.id}
+                        name={product.name}
+                        price={product.price}
+                        type="PHYSICAL"
+                        image={product.images?.[0]}
+                        partnerId={partner.id}
+                        partnerName={partner.name}
+                        partnerSlug={partner.slug}
+                        stock={product.stock}
+                      />
                     </div>
                   </Card>
                 ))}
@@ -256,7 +270,16 @@ export default async function PartnerStorefrontPage({ params }: Props) {
                         </p>
                       )}
 
-                      <Button className="mt-3 w-full">View / Reserve</Button>
+                      <AddToCartButton
+                        id={service.id}
+                        name={service.name}
+                        price={service.price}
+                        type="SERVICE"
+                        image={service.images?.[0]}
+                        partnerId={partner.id}
+                        partnerName={partner.name}
+                        partnerSlug={partner.slug}
+                      />
                     </div>
                   </Card>
                 ))}
