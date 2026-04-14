@@ -267,7 +267,7 @@ model Order {
   userId        String
   partnerId     String
   addressId     String?
-  status        OrderStatus   @default(PENDING)
+  status OrderStatus @default(PENDING_PAYMENT)
   paymentStatus PaymentStatus @default(PENDING)
   subtotal      Int
   discountAmount Int          @default(0)
