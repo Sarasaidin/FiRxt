@@ -1,45 +1,37 @@
-export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { formatCurrency } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { AddToCartButton } from "@/components/cart/add-to-cart-button";
-import { MapPin, Phone, Globe, Clock } from "lucide-react";
-
-export const revalidate = 60;
+import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@/lib/utils";
 
 interface Props {
   params: Promise<{ slug: string }>;
-}
-
-export async function generateMetadata({ params }: Props) {
-  const { slug } = await params;
-  const partner = await prisma.partner.findUnique({
-    where: { slug },
-    select: { name: true, description: true },
-  });
-  return {
-    title: partner?.name ?? "Partner",
-    description: partner?.description ?? undefined,
-  };
 }
 
 export default async function PartnerStorefrontPage({ params }: Props) {
   const { slug } = await params;
 
   const partner = await prisma.partner.findUnique({
-    where: { slug, status: "APPROVED" },
+    where: { slug },
     include: {
-      products: { where: { isActive: true }, orderBy: { isFeatured: "desc" } },
-      services: { where: { isActive: true }, orderBy: { isFeatured: "desc" } },
-      reviews: {
-        take: 5,
+      products: {
+        where: { isActive: true },
         orderBy: { createdAt: "desc" },
-        include: { user: { select: { name: true } } },
       },
-      _count: { select: { reviews: true } },
+      services: {
+        where: { isActive: true },
+        orderBy: { createdAt: "desc" },
+      },
+      promotions: {
+        where: {
+          status: "ACTIVE",
+          startDate: { lte: new Date() },
+          endDate: { gte: new Date() },
+        },
+        orderBy: { createdAt: "desc" },
+      },
     },
   });
 
@@ -56,183 +48,227 @@ export default async function PartnerStorefrontPage({ params }: Props) {
             src={partner.bannerUrl}
             alt={partner.name}
             fill
-            className="object-cover opacity-40"
+            className="object-cover opacity-30"
           />
         )}
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 -mt-12 pb-12">
+      <div className="mx-auto max-w-7xl px-4 pb-10">
         {/* Profile card */}
-        <Card className="p-6 mb-6">
-          <div className="flex items-start gap-4">
-            <div className="h-20 w-20 flex-shrink-0 rounded-xl overflow-hidden border-2 border-white shadow-md bg-brand-navy text-white flex items-center justify-center text-2xl font-bold">
+        <Card className="-mt-16 mb-6 p-6 relative z-10">
+          <div className="flex flex-col md:flex-row md:items-start gap-6">
+            <div className="relative h-24 w-24 overflow-hidden rounded-xl border bg-white">
               {partner.logoUrl ? (
-                <Image src={partner.logoUrl} alt={partner.name} width={80} height={80} className="h-full w-full object-cover" />
+                <Image
+                  src={partner.logoUrl}
+                  alt={partner.name}
+                  fill
+                  className="object-cover"
+                />
               ) : (
-                partner.name.charAt(0)
+                <div className="flex h-full w-full items-center justify-center text-3xl">
+                  {partner.type === "PHARMACY" ? "💊" : "🏥"}
+                </div>
               )}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold text-brand-navy">{partner.name}</h1>
-                {partner.isVerified && <Badge variant="blue">Verified</Badge>}
-                <Badge variant="green">{typeLabel}</Badge>
-              </div>
-              {partner.description && (
-                <p className="text-gray-600 text-sm mt-1">{partner.description}</p>
-              )}
-              <div className="flex flex-wrap gap-4 mt-3 text-sm text-gray-500">
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-4 w-4" />
-                  {partner.addressLine1}, {partner.city}, {partner.state}
-                </span>
-                {partner.phone && (
-                  <a href={`tel:${partner.phone}`} className="flex items-center gap-1 hover:text-brand-green">
-                    <Phone className="h-4 w-4" /> {partner.phone}
-                  </a>
+
+            <div className="flex-1">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-bold text-brand-navy">
+                  {partner.name}
+                </h1>
+                {partner.isVerified && (
+                  <span className="rounded-full bg-brand-green/10 px-2 py-1 text-xs font-medium text-brand-green">
+                    Verified
+                  </span>
                 )}
+                <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">
+                  {typeLabel}
+                </span>
+              </div>
+
+              {partner.description && (
+                <p className="mb-4 text-gray-600">{partner.description}</p>
+              )}
+
+              <div className="space-y-1 text-sm text-gray-600">
+                <p>
+                  {partner.addressLine1}, {partner.city}, {partner.state}
+                </p>
+
+                {partner.phone && <p>{partner.phone}</p>}
+
                 {partner.website && (
-                  <a href={partner.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-brand-green">
-                    <Globe className="h-4 w-4" /> Website
-                  </a>
+                  <p>
+                    <a
+                      href={partner.website}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-brand-green hover:underline"
+                    >
+                      {partner.website}
+                    </a>
+                  </p>
                 )}
               </div>
             </div>
           </div>
-          <Card className="p-4 mb-6">
-            <p className="text-sm text-gray-700">
-              {partner.type === "PHARMACY"
-                ? "Reserve and pay online, then collect your items in store."
-                : "Reserve and pay online, then attend your appointment at the clinic."}
-            </p>
-          </Card>
+        </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Products & Services */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Products */}
-            {partner.products.length > 0 && (
-              <section>
-                <h2 className="text-lg font-bold text-brand-navy mb-3">Products</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {partner.products.map((product) => (
-                    <Card key={product.id} className="p-4">
-                      {product.images[0] && (
-                        <Image
-                          src={product.images[0]}
-                          alt={product.name}
-                          width={300}
-                          height={180}
-                          className="w-full h-36 object-cover rounded-lg mb-3"
-                        />
-                      )}
-                      <h3 className="font-semibold text-brand-navy text-sm">{product.name}</h3>
-                      {product.brand && (
-                        <p className="text-xs text-gray-500">{product.brand}</p>
-                      )}
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="font-bold text-brand-green">
-                          {formatCurrency(product.price)}
-                        </span>
-                        {product.comparePrice && (
-                          <span className="text-xs text-gray-400 line-through">
-                            {formatCurrency(product.comparePrice)}
-                          </span>
-                        )}
-                      </div>
-                      {product.requiresPrescription && (
-                        <Badge variant="yellow" className="mt-1 text-xs">Rx Required</Badge>
-                      )}
-                      <AddToCartButton
-                        id={product.id}
-                        name={product.name}
-                        price={product.price}
-                        type="PHYSICAL"
-                        image={product.images[0]}
-                        partnerId={partner.id}
-                        partnerName={partner.name}
-                        partnerSlug={partner.slug}
-                        stock={product.stock}
+        <Card className="mb-6 p-4">
+          <p className="text-sm text-gray-700">
+            {partner.type === "PHARMACY"
+              ? "Reserve and pay online, then collect your items in store."
+              : "Reserve and pay online, then attend your appointment at the clinic."}
+          </p>
+        </Card>
+
+        {/* Promotions */}
+        {partner.promotions.length > 0 && (
+          <section className="mb-8">
+            <h2 className="mb-3 text-lg font-semibold text-gray-800">
+              Promotions
+            </h2>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {partner.promotions.map((promo) => (
+                <Card key={promo.id} className="p-4">
+                  <h3 className="font-semibold text-brand-navy">{promo.title}</h3>
+                  {promo.description && (
+                    <p className="mt-1 text-sm text-gray-600">
+                      {promo.description}
+                    </p>
+                  )}
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Products & Services */}
+        <div className="grid gap-10 lg:grid-cols-2">
+          {/* Products */}
+          <section>
+            <h2 className="mb-4 text-lg font-semibold text-gray-800">
+              Products
+            </h2>
+
+            {partner.products.length === 0 ? (
+              <Card className="p-6 text-center text-sm text-gray-500">
+                No products available yet.
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {partner.products.map((product) => (
+                  <Card
+                    key={product.id}
+                    className="overflow-hidden transition-shadow hover:shadow-md"
+                  >
+                    {product.images?.[0] ? (
+                      <Image
+                        src={product.images[0]}
+                        alt={product.name}
+                        width={500}
+                        height={240}
+                        className="h-40 w-full object-cover"
                       />
-                    </Card>
-                  ))}
-                </div>
-              </section>
-            )}
+                    ) : (
+                      <div className="flex h-40 w-full items-center justify-center bg-gray-100 text-4xl">
+                        💊
+                      </div>
+                    )}
 
-            {/* Services */}
-            {partner.services.length > 0 && (
-              <section>
-                <h2 className="text-lg font-bold text-brand-navy mb-3">Services</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {partner.services.map((service) => (
-                    <Card key={service.id} className="p-4">
-                      {service.images[0] && (
-                        <Image
-                          src={service.images[0]}
-                          alt={service.name}
-                          width={300}
-                          height={180}
-                          className="w-full h-36 object-cover rounded-lg mb-3"
-                        />
-                      )}
-                      <h3 className="font-semibold text-brand-navy text-sm">{service.name}</h3>
-                      {service.durationMinutes && (
-                        <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                          <Clock className="h-3 w-3" /> {service.durationMinutes} min
+                    <div className="p-4">
+                      <h3 className="line-clamp-2 font-semibold text-brand-navy">
+                        {product.name}
+                      </h3>
+
+                      {product.description && (
+                        <p className="mt-1 line-clamp-2 text-sm text-gray-600">
+                          {product.description}
                         </p>
                       )}
-                      <div className="mt-2">
-                        <span className="font-bold text-brand-green">
-                          {formatCurrency(service.price)}
-                        </span>
-                      </div>
-                      <AddToCartButton
-                        id={service.id}
-                        name={service.name}
-                        price={service.price}
-                        type="SERVICE"
-                        image={service.images[0]}
-                        partnerId={partner.id}
-                        partnerName={partner.name}
-                        partnerSlug={partner.slug}
-                      />
-                    </Card>
-                  ))}
-                </div>
-              </section>
-            )}
 
-            {partner.products.length === 0 && partner.services.length === 0 && (
-              <Card className="p-8 text-center text-gray-500">
-                <p>No products or services listed yet.</p>
-              </Card>
-            )}
-          </div>
+                      <p className="mt-2 font-bold text-brand-green">
+                        {formatCurrency(product.price)}
+                      </p>
 
-          {/* Sidebar: Reviews */}
-          <div className="space-y-4">
-            <Card className="p-4">
-              <h3 className="font-bold text-brand-navy mb-3">
-                Reviews ({partner._count.reviews})
-              </h3>
-              {partner.reviews.length === 0 ? (
-                <p className="text-sm text-gray-500">No reviews yet.</p>
-              ) : (
-                <div className="space-y-4">
-                  {partner.reviews.map((review) => (
-                    <div key={review.id} className="border-b border-gray-100 pb-3 last:border-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-sm">{review.user.name}</span>
-                        <span className="text-yellow-500">{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</span>
-                      </div>
-                      {review.body && <p className="text-xs text-gray-600">{review.body}</p>}
+                      <p className="mt-1 text-xs text-gray-500">
+                        Stock: {product.stock}
+                      </p>
+
+                      <Button className="mt-3 w-full">View / Reserve</Button>
                     </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Services */}
+          <section>
+            <h2 className="mb-4 text-lg font-semibold text-gray-800">
+              Services
+            </h2>
+
+            {partner.services.length === 0 ? (
+              <Card className="p-6 text-center text-sm text-gray-500">
+                No services available yet.
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {partner.services.map((service) => (
+                  <Card
+                    key={service.id}
+                    className="overflow-hidden transition-shadow hover:shadow-md"
+                  >
+                    {service.images?.[0] ? (
+                      <Image
+                        src={service.images[0]}
+                        alt={service.name}
+                        width={500}
+                        height={240}
+                        className="h-40 w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-40 w-full items-center justify-center bg-gray-100 text-4xl">
+                        🏥
+                      </div>
+                    )}
+
+                    <div className="p-4">
+                      <h3 className="line-clamp-2 font-semibold text-brand-navy">
+                        {service.name}
+                      </h3>
+
+                      {service.description && (
+                        <p className="mt-1 line-clamp-2 text-sm text-gray-600">
+                          {service.description}
+                        </p>
+                      )}
+
+                      <p className="mt-2 font-bold text-brand-green">
+                        {formatCurrency(service.price)}
+                      </p>
+
+                      {service.durationMinutes && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          Duration: {service.durationMinutes} mins
+                        </p>
+                      )}
+
+                      <Button className="mt-3 w-full">View / Reserve</Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+
+        <div className="mt-8">
+          <Link href="/" className="text-sm text-brand-green hover:underline">
+            ← Back to marketplace
+          </Link>
         </div>
       </div>
     </div>
