@@ -4,7 +4,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
-import { AddToCartButton } from "@/app/components/cart/add-to-cart-button";
+import { AddToCartButton } from "@/components/cart/add-to-cart-button";
 
 interface Props {
   params: Promise<{ slug: string }>;
