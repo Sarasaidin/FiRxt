@@ -187,6 +187,7 @@ model Partner {
   orders     Order[]
   reviews    Review[]
   promotions Promotion[]
+  promotionLinks PromotionPartner[]
   analytics  PartnerAnalytic[]
 
   @@map("partners")
@@ -348,6 +349,7 @@ model Promotion {
 
   partner Partner?        @relation(fields: [partnerId], references: [id])
   items   PromotionItem[]
+  participatingPartners PromotionPartner[]
   orders  Order[]
 
   @@map("promotions")
@@ -362,6 +364,19 @@ model PromotionItem {
   product   Product   @relation(fields: [productId], references: [id])
 
   @@map("promotion_items")
+}
+
+model PromotionPartner {
+  id          String   @id @default(cuid())
+  promotionId String
+  partnerId   String
+  createdAt   DateTime @default(now())
+
+  promotion Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  partner   Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@unique([promotionId, partnerId])
+  @@map("promotion_partners")
 }
 
 model Review {

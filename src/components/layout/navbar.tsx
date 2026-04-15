@@ -11,12 +11,17 @@ import { FiRxtLogo } from "./firxt-logo";
 export function Navbar() {
   const { data: session } = useSession();
   const router = useRouter();
-  const itemCount = useCartStore((s) => s.itemCount)();
+  const itemCountFn = useCartStore((s) => s.itemCount);
+  const rawItemCount = itemCountFn();
+  const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [deliveryType, setDeliveryType] = useState("Home Delivery");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -28,6 +33,7 @@ export function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const itemCount = mounted ? rawItemCount : 0;
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -113,7 +119,7 @@ export function Navbar() {
           {/* Cart */}
           <Link href="/cart" className="relative hidden md:flex items-center gap-1 text-sm hover:text-brand-teal transition-colors">
             <ShoppingCart className="h-5 w-5" />
-            {itemCount > 0 && (
+            {mounted && itemCount > 0 && (
               <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-brand-red text-xs font-bold">
                 {itemCount}
               </span>
@@ -207,7 +213,7 @@ export function Navbar() {
             <Link href="/map" className="text-sm py-2 hover:text-brand-teal" onClick={() => setMobileMenuOpen(false)}>Map View</Link>
             <Link href="/promotions" className="text-sm py-2 hover:text-brand-teal" onClick={() => setMobileMenuOpen(false)}>Promotions</Link>
             <Link href="/partner-register" className="text-sm py-2 hover:text-brand-teal" onClick={() => setMobileMenuOpen(false)}>Partner with us</Link>
-            <Link href="/cart" className="text-sm py-2 hover:text-brand-teal" onClick={() => setMobileMenuOpen(false)}>Cart ({itemCount})</Link>
+            <Link href="/cart" className="text-sm py-2 hover:text-brand-teal" onClick={() => setMobileMenuOpen(false)}>Cart ({mounted ? itemCount : 0})</Link>
           </div>
         )}
       </div>

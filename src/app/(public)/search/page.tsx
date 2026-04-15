@@ -8,8 +8,35 @@ import Link from "next/link";
 import Image from "next/image";
 import { PHASE1_PARTNER_TYPES } from "@/lib/phase1";
 
+function getTodayKey() {
+  const day = new Date().getDay();
+  return ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][day];
+}
+
+function toMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function isPartnerOpenNow(operatingHours: any) {
+  if (!operatingHours || typeof operatingHours !== "object") return false;
+
+  const todayKey = getTodayKey();
+  const todayHours = operatingHours[todayKey];
+
+  if (!todayHours || todayHours.closed) return false;
+  if (!todayHours.open || !todayHours.close) return false;
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const openMinutes = toMinutes(todayHours.open);
+  const closeMinutes = toMinutes(todayHours.close);
+
+  return currentMinutes >= openMinutes && currentMinutes <= closeMinutes;
+}
+
 interface Props {
-  searchParams: Promise<{ q?: string; type?: string }>;
+  searchParams: Promise<{ q?: string; type?: string; openNow?: string }>;
 }
 
 export async function generateMetadata({ searchParams }: Props) {
@@ -18,7 +45,7 @@ export async function generateMetadata({ searchParams }: Props) {
 }
 
 export default async function SearchPage({ searchParams }: Props) {
-  const { q, type } = await searchParams;
+  const { q, type, openNow } = await searchParams;
 
   const allowedType =
     type && PHASE1_PARTNER_TYPES.includes(type as any) ? type : undefined;
@@ -26,11 +53,15 @@ export default async function SearchPage({ searchParams }: Props) {
   const partnerWhere: any = {
     status: "APPROVED",
     type: { in: PHASE1_PARTNER_TYPES as any },
-  };
+};
 
-  const itemWhere: any = {
+  const productWhere: any = {
     isActive: true,
-  };
+};
+
+  const serviceWhere: any = {
+    isActive: true,
+};
 
   if (allowedType) {
     partnerWhere.type = allowedType;
@@ -43,14 +74,19 @@ export default async function SearchPage({ searchParams }: Props) {
       { description: { contains: q, mode: "insensitive" } },
     ];
 
-    itemWhere.OR = [
+    productWhere.OR = [
       { name: { contains: q, mode: "insensitive" } },
       { description: { contains: q, mode: "insensitive" } },
       { brand: { contains: q, mode: "insensitive" } },
     ];
+
+    serviceWhere.OR = [
+      { name: { contains: q, mode: "insensitive" } },
+      { description: { contains: q, mode: "insensitive" } },
+    ];
   }
 
-  const [partners, products, services] = await Promise.all([
+  const [rawPartners, products, services] = await Promise.all([
     prisma.partner.findMany({
       where: partnerWhere,
       select: {
@@ -65,6 +101,7 @@ export default async function SearchPage({ searchParams }: Props) {
         isVerified: true,
         latitude: true,
         longitude: true,
+        operatingHours: true,
       },
       take: 20,
     }),
@@ -72,7 +109,7 @@ export default async function SearchPage({ searchParams }: Props) {
     q
       ? prisma.product.findMany({
           where: {
-            ...itemWhere,
+            ...productWhere,
             partner: {
               status: "APPROVED",
               type: allowedType
@@ -100,7 +137,7 @@ export default async function SearchPage({ searchParams }: Props) {
     q
       ? prisma.service.findMany({
           where: {
-            ...itemWhere,
+            ...serviceWhere,
             partner: {
               status: "APPROVED",
               type: allowedType
@@ -126,6 +163,11 @@ export default async function SearchPage({ searchParams }: Props) {
       : [],
   ]);
 
+  const partners =
+    openNow === "true"
+      ? rawPartners.filter((partner) => isPartnerOpenNow(partner.operatingHours))
+      : rawPartners;
+
   const pageTitle = q
     ? `Results for "${q}"`
     : allowedType === "PHARMACY"
@@ -141,6 +183,72 @@ export default async function SearchPage({ searchParams }: Props) {
       <p className="text-gray-500 text-sm mb-6">
         {partners.length} partners, {products.length} products, {services.length} services found
       </p>
+
+    <div className="mb-6 flex flex-wrap gap-2">
+      <Link
+        href={`/search${
+          q || openNow
+            ? `?${new URLSearchParams({
+                ...(q ? { q } : {}),
+                ...(openNow ? { openNow } : {}),
+              }).toString()}`
+            : ""
+        }`}
+        className={`rounded-full px-3 py-1.5 text-sm border ${
+          !allowedType
+            ? "border-brand-green bg-brand-green text-white"
+            : "border-gray-300 text-gray-600 hover:border-brand-green"
+        }`}
+      >
+        All
+      </Link>
+
+      <Link
+        href={`/search?${new URLSearchParams({
+          ...(q ? { q } : {}),
+          ...(openNow ? { openNow } : {}),
+          type: "PHARMACY",
+        }).toString()}`}
+        className={`rounded-full px-3 py-1.5 text-sm border ${
+          allowedType === "PHARMACY"
+            ? "border-brand-green bg-brand-green text-white"
+            : "border-gray-300 text-gray-600 hover:border-brand-green"
+        }`}
+      >
+        Pharmacy
+      </Link>
+
+      <Link
+        href={`/search?${new URLSearchParams({
+          ...(q ? { q } : {}),
+          ...(openNow ? { openNow } : {}),
+          type: "CLINIC",
+        }).toString()}`}
+        className={`rounded-full px-3 py-1.5 text-sm border ${
+          allowedType === "CLINIC"
+            ? "border-brand-green bg-brand-green text-white"
+            : "border-gray-300 text-gray-600 hover:border-brand-green"
+        }`}
+      >
+        Clinic
+      </Link>
+    
+      <Link
+        href={`/search?${new URLSearchParams({
+          ...(q ? { q } : {}),
+          ...(allowedType ? { type: allowedType } : {}),
+          openNow: openNow === "true" ? "false" : "true",
+        }).toString()}`}
+        className={`rounded-full px-3 py-1.5 text-sm border ${
+          openNow === "true"
+            ? "border-brand-green bg-brand-green text-white"
+            : "border-gray-300 text-gray-600 hover:border-brand-green"
+        }`}
+      >
+        Open Now
+      </Link>
+
+    </div>
 
       {/* Partners */}
       {partners.length > 0 && (

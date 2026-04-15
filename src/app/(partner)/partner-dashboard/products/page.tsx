@@ -21,6 +21,8 @@ export default async function PartnerProductsPage() {
     orderBy: { createdAt: "desc" },
     include: { category: { select: { name: true } } },
   });
+  const lowStockCount = products.filter((p) => p.stock > 0 && p.stock <= 5).length;
+  const outOfStockCount = products.filter((p) => p.stock <= 0).length;
 
   return (
     <div>
@@ -33,6 +35,23 @@ export default async function PartnerProductsPage() {
         </Link>
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <Card className="p-4">
+          <p className="text-sm text-gray-500">Total Products</p>
+          <p className="text-2xl font-bold text-brand-navy">{products.length}</p>
+        </Card>
+
+        <Card className="p-4">
+          <p className="text-sm text-gray-500">Low Stock</p>
+          <p className="text-2xl font-bold text-yellow-600">{lowStockCount}</p>
+        </Card> 
+
+        <Card className="p-4">
+          <p className="text-sm text-gray-500">Out of Stock</p>
+          <p className="text-2xl font-bold text-brand-red">{outOfStockCount}</p>
+        </Card>
+      </div>
+      
       {products.length === 0 ? (
         <Card className="p-10 text-center">
           <p className="text-gray-500 mb-4">No products yet.</p>
@@ -65,9 +84,29 @@ export default async function PartnerProductsPage() {
                   <td className="px-4 py-3 text-gray-600">{p.category?.name ?? "—"}</td>
                   <td className="px-4 py-3 font-medium">{formatCurrency(p.price)}</td>
                   <td className="px-4 py-3">
-                    <span className={p.stock === 0 ? "text-brand-red font-medium" : "text-gray-700"}>
-                      {p.stock}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span
+                        className={
+                          p.stock <= 0
+                            ? "font-medium text-brand-red"
+                            : p.stock <= 5
+                            ? "font-medium text-yellow-600"
+                            : "text-gray-700"
+                        }
+                      >
+                        {p.stock}
+                      </span>
+
+                      {p.stock <= 0 ? (
+                        <Badge variant="red" className="w-fit text-xs">
+                          Out of Stock
+                        </Badge>
+                      ) : p.stock <= 5 ? (
+                        <Badge variant="yellow" className="w-fit text-xs">
+                          Low Stock
+                        </Badge>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant={p.isActive ? "green" : "gray"}>

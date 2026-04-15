@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { Card } from "@/components/ui/card";
@@ -12,20 +12,44 @@ import { toast } from "@/components/ui/toaster";
 export default function NewPromotionPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [partners, setPartners] = useState<any[]>([]);
+  const [selectedPartnerIds, setSelectedPartnerIds] = useState<string[]>([]);
   const { register, handleSubmit } = useForm({
     defaultValues: {
       title: "", description: "", type: "PERCENTAGE", discountValue: "",
       minOrderValue: "", code: "", usageLimit: "", startDate: "", endDate: "",
     },
   });
+  useEffect(() => {
+    async function loadPartners() {
+      const res = await fetch("/api/partners");
+      const data = await res.json();
+      console.log("partners api:", data.partners);
+      setPartners(data.partners ?? []);
+    }
+
+    loadPartners();
+  }, []);
+
+  function togglePartner(partnerId: string) {
+    setSelectedPartnerIds((prev) =>
+      prev.includes(partnerId)
+        ? prev.filter((id) => id !== partnerId)
+        : [...prev, partnerId]
+    );
+  }
 
   async function onSubmit(data: any) {
     setLoading(true);
+
+    console.log("selectedPartnerIds:", selectedPartnerIds);
+
     const res = await fetch("/api/promotions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...data,
+        partnerIds: selectedPartnerIds,
         discountValue: parseFloat(data.discountValue),
         minOrderValue: data.minOrderValue ? parseFloat(data.minOrderValue) * 100 : null,
         usageLimit: data.usageLimit ? parseInt(data.usageLimit) : null,
@@ -46,6 +70,39 @@ export default function NewPromotionPage() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <textarea {...register("description")} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-green focus:outline-none" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Participating Merchants
+            </label>
+
+            <div className="max-h-56 overflow-y-auto rounded-lg border border-gray-300 p-3 space-y-2">
+              {partners.length === 0 ? (
+                <p className="text-sm text-gray-400">No approved merchants found.</p>
+              ) : (
+                partners.map((partner) => (
+                  <label
+                    key={partner.id}
+                    className="flex items-center gap-2 text-sm text-gray-700"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedPartnerIds.includes(partner.id)}
+                      onChange={() => togglePartner(partner.id)}
+                      className="rounded border-gray-300"
+                    />
+                    <span>
+                      {partner.name}{" "}
+                      <span className="text-gray-400">({partner.type})</span>
+                    </span>
+                  </label>
+                ))
+              )}
+            </div>
+
+            <p className="mt-2 text-xs text-gray-500">
+              Selected: {selectedPartnerIds.length} merchant(s)
+            </p>
           </div>
           <Select
             {...register("type")}

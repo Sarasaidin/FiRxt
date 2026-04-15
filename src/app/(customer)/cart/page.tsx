@@ -21,41 +21,89 @@ export default function CartPage() {
 
   const total = subtotal();
 
-  async function handleCheckout() {
-    if (!session) {
-      router.push("/login?callbackUrl=/cart");
-      return;
-    }
+async function handleCheckout() {
+  if (!session) {
+    router.push("/login?callbackUrl=/cart");
+    return;
+  }
 
+  if (items.length === 0) {
+    setError("Your cart is empty.");
+    return;
+  }
+
+  const partnerId = items[0]?.partnerId;
+
+  if (!partnerId) {
+    setError("Missing partner information.");
+    return;
+  }
+
+  const hasDifferentPartners = items.some((item) => item.partnerId !== partnerId);
+  if (hasDifferentPartners) {
+    setError("Please checkout items from one merchant at a time.");
+    return;
+  }
+
+  try {
     setLoading(true);
     setError("");
 
     const res = await fetch("/api/checkout/session", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        items: items.map((i) => ({ id: i.id, type: i.type, quantity: i.quantity, price: i.price })),
+        partnerId,
+        items: items.map((item) => ({
+          id: item.id,
+          type: item.type,
+          quantity: item.quantity,
+          price: item.price,
+          name: item.name,
+        })),
         promoCode: promoCode || undefined,
       }),
     });
 
-    const json = await res.json();
-    setLoading(false);
+    const raw = await res.text();
+
+    let json: any = {};
+    try {
+      json = raw ? JSON.parse(raw) : {};
+    } catch {
+      console.error("Non-JSON checkout response:", raw);
+      setError("Checkout endpoint returned an invalid response. Check browser console.");
+      return;
+    }
 
     if (!res.ok) {
       setError(json.error ?? "Checkout failed");
       return;
     }
 
-    window.location.href = json.url;
-  }
+    if (!json.url) {
+      setError("Checkout session was created, but no payment URL was returned.");
+      return;
+    }
 
+    window.location.href = json.url;
+  } catch (err) {
+    console.error("Checkout error:", err);
+    setError("Unable to proceed to checkout. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+}
   if (items.length === 0) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <ShoppingCart className="mx-auto h-16 w-16 text-gray-300 mb-4" />
-        <h1 className="text-2xl font-bold text-gray-700 mb-2">Your cart is empty</h1>
-        <p className="text-gray-500 mb-6">Browse our partners to find health products and services.</p>
+        <ShoppingCart className="mx-auto mb-4 h-16 w-16 text-gray-300" />
+        <h1 className="mb-2 text-2xl font-bold text-gray-700">Your cart is empty</h1>
+        <p className="mb-6 text-gray-500">
+          Browse our partners to find health products and services.
+        </p>
         <Link href="/">
           <Button>Browse Partners</Button>
         </Link>
@@ -65,44 +113,62 @@ export default function CartPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="text-2xl font-bold text-brand-navy mb-6">Shopping Cart</h1>
+      <h1 className="mb-6 text-2xl font-bold text-brand-navy">Shopping Cart</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Items */}
-        <div className="lg:col-span-2 space-y-3">
+        <div className="space-y-3 lg:col-span-2">
           {items.map((item) => (
-            <Card key={item.id} className="flex items-center gap-4 p-4">
+            <Card key={`${item.id}-${item.type}`} className="flex items-center gap-4 p-4">
               {item.image ? (
-                <Image src={item.image} alt={item.name} width={72} height={72} className="h-18 w-18 rounded-lg object-cover flex-shrink-0" />
+                <Image
+                  src={item.image}
+                  alt={item.name}
+                  width={72}
+                  height={72}
+                  className="h-18 w-18 flex-shrink-0 rounded-lg object-cover"
+                />
               ) : (
-                <div className="h-16 w-16 flex-shrink-0 rounded-lg bg-gray-100 flex items-center justify-center text-2xl">
+                <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-2xl">
                   {item.type === "SERVICE" ? "🏥" : "💊"}
                 </div>
               )}
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-brand-navy text-sm">{item.name}</p>
+
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-brand-navy">{item.name}</p>
                 <p className="text-xs text-gray-500">{item.partnerName}</p>
-                <p className="font-bold text-brand-green mt-1">{formatCurrency(item.price)}</p>
+                <p className="mt-1 font-bold text-brand-green">
+                  {formatCurrency(item.price)}
+                </p>
               </div>
+
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 hover:border-brand-green transition-colors"
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 transition-colors hover:border-brand-green"
                 >
                   <Minus className="h-3 w-3" />
                 </button>
-                <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
+
+                <span className="w-6 text-center text-sm font-medium">
+                  {item.quantity}
+                </span>
+
                 <button
                   onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 hover:border-brand-green transition-colors"
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 transition-colors hover:border-brand-green"
                 >
                   <Plus className="h-3 w-3" />
                 </button>
               </div>
-              <p className="font-bold text-sm w-20 text-right">{formatCurrency(item.price * item.quantity)}</p>
+
+              <p className="w-20 text-right text-sm font-bold">
+                {formatCurrency(item.price * item.quantity)}
+              </p>
+
               <button
                 onClick={() => removeItem(item.id)}
-                className="text-gray-400 hover:text-brand-red transition-colors"
+                className="text-gray-400 transition-colors hover:text-brand-red"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -111,7 +177,7 @@ export default function CartPage() {
 
           <button
             onClick={clearCart}
-            className="text-sm text-gray-400 hover:text-brand-red transition-colors"
+            className="text-sm text-gray-400 transition-colors hover:text-brand-red"
           >
             Clear cart
           </button>
@@ -119,11 +185,10 @@ export default function CartPage() {
 
         {/* Summary */}
         <div>
-          <Card className="p-5 sticky top-4">
-            <h2 className="font-bold text-brand-navy mb-4">Order Summary</h2>
+          <Card className="sticky top-4 p-5">
+            <h2 className="mb-4 font-bold text-brand-navy">Order Summary</h2>
 
-            {/* Promo code */}
-            <div className="flex gap-2 mb-4">
+            <div className="mb-4 flex gap-2">
               <input
                 value={promoCode}
                 onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
@@ -132,33 +197,36 @@ export default function CartPage() {
               />
             </div>
 
-            <div className="space-y-2 text-sm text-gray-600 border-t border-gray-100 pt-4">
+            <div className="space-y-2 border-t border-gray-100 pt-4 text-sm text-gray-600">
               <div className="flex justify-between">
                 <span>Subtotal</span>
                 <span>{formatCurrency(total)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Delivery</span>
-                <span className="text-brand-green">Calculated at checkout</span>
+                <span>Fulfilment</span>
+                <span className="text-brand-green">In-store collection / visit</span>
               </div>
             </div>
 
-            <div className="flex justify-between font-bold text-brand-navy mt-4 pt-4 border-t border-gray-200">
+            <div className="mt-4 flex justify-between border-t border-gray-200 pt-4 font-bold text-brand-navy">
               <span>Total</span>
               <span>{formatCurrency(total)}</span>
             </div>
 
-            {error && (
-              <p className="mt-2 text-xs text-brand-red">{error}</p>
-            )}
+            {error && <p className="mt-2 text-xs text-brand-red">{error}</p>}
 
             <Button
               onClick={handleCheckout}
               loading={loading}
-              className="w-full mt-4"
+              disabled={loading}
+              className="mt-4 w-full"
               size="lg"
             >
-              {session ? "Proceed to Checkout" : "Sign in to Checkout"}
+              {loading
+                ? "Redirecting..."
+                : session
+                ? "Proceed to Checkout"
+                : "Sign in to Checkout"}
             </Button>
           </Card>
         </div>
