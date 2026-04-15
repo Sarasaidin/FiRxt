@@ -3,6 +3,10 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
 function csvEscape(value: unknown) {
   const str = String(value ?? "");
   if (str.includes(",") || str.includes('"') || str.includes("\n")) {
@@ -11,17 +15,14 @@ function csvEscape(value: unknown) {
   return str;
 }
 
-export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: Request, { params }: RouteContext) {
   const session = await getServerSession(authOptions);
 
   if (!session || session.user.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const id = params.id;
+  const { id } = await params;
   const { searchParams } = new URL(req.url);
 
   const merchant = searchParams.get("merchant");
@@ -47,16 +48,30 @@ export async function GET(
 
   if (start || end) {
     where.createdAt = {};
-    if (start) where.createdAt.gte = new Date(`${start}T00:00:00`);
-    if (end) where.createdAt.lte = new Date(`${end}T23:59:59.999`);
+    if (start) {
+      where.createdAt.gte = new Date(`${start}T00:00:00`);
+    }
+    if (end) {
+      where.createdAt.lte = new Date(`${end}T23:59:59.999`);
+    }
   }
 
   const orders = await prisma.order.findMany({
     where,
     orderBy: { createdAt: "desc" },
     include: {
-      user: { select: { name: true, email: true } },
-      partner: { select: { name: true, type: true } },
+      user: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
+      partner: {
+        select: {
+          name: true,
+          type: true,
+        },
+      },
       items: {
         include: {
           product: { select: { name: true } },
