@@ -15,33 +15,17 @@ export function FiRxtLogo({
   monochrome = false,
   reversed = false,
 }: FiRxtLogoProps) {
-  const bgClass = reversed
+  const containerClass = reversed
     ? "bg-white/10 border border-white/20"
+    : monochrome
+    ? "bg-transparent"
     : "bg-[#0B1D3B] border border-white/15";
 
-  const textBase = monochrome
-    ? reversed
-      ? "text-white"
-      : "text-[#0B1D3B]"
-    : "";
+  const monoText = reversed ? "text-white" : "text-[#0B1D3B]";
 
-  const fiClass = monochrome
-    ? textBase
-    : reversed
-    ? "text-[#5FB346]"
-    : "text-[#5FB346]";
-
-  const rClass = monochrome
-    ? textBase
-    : reversed
-    ? "text-[#B22625]"
-    : "text-[#B22625]";
-
-  const xtClass = monochrome
-    ? textBase
-    : reversed
-    ? "text-white"
-    : "text-[#5FB346]";
+  const fiClass = monochrome ? monoText : "text-[#5FB346]";
+  const rClass = monochrome ? monoText : "text-[#B22625]";
+  const xtClass = monochrome ? monoText : reversed ? "text-white" : "text-[#5FB346]";
 
   const taglineClass = reversed ? "text-white/70" : "text-white/70";
   const poweredByClass = reversed ? "text-white/80" : "text-[#0B1D3B]/70";
@@ -52,7 +36,7 @@ export function FiRxtLogo({
         <div
           className={cn(
             "inline-flex items-center rounded-full px-3 py-1.5 shadow-sm",
-            bgClass
+            containerClass
           )}
         >
           <span
@@ -78,7 +62,7 @@ export function FiRxtLogo({
       {showTagline && (
         <div className="hidden sm:block">
           <p
-            className={cn("text-xs leading-none", reversed ? "text-white/70" : "text-white/70")}
+            className={cn("text-xs leading-none", taglineClass)}
             style={{ fontFamily: "Russo One, sans-serif" }}
           >
             Live Smart
@@ -91,7 +75,7 @@ export function FiRxtLogo({
 
 export function FiRxtLogoDark({
   className,
-  showPoweredBy = false,
+  showPoweredBy = true,
 }: {
   className?: string;
   showPoweredBy?: boolean;
@@ -131,15 +115,17 @@ export function FiRxtLogoDark({
 export function FiRxtLogoMono({
   className,
   reversed = false,
+  showPoweredBy = false,
 }: {
   className?: string;
   reversed?: boolean;
+  showPoweredBy?: boolean;
 }) {
   return (
-    <div className={cn("inline-flex items-center gap-2", className)}>
+    <div className={cn("inline-flex flex-col items-start gap-1", className)}>
       <div
         className={cn(
-          "rounded-full px-3 py-1.5",
+          "inline-flex items-center rounded-full px-3 py-1.5",
           reversed ? "bg-white/10 border border-white/20" : "bg-transparent"
         )}
       >
@@ -153,6 +139,18 @@ export function FiRxtLogoMono({
           FiRxt
         </span>
       </div>
+
+      {showPoweredBy && (
+        <span
+          className={cn(
+            "text-[10px] leading-none",
+            reversed ? "text-white/80" : "text-[#0B1D3B]/60"
+          )}
+          style={{ fontFamily: "Russo One, sans-serif" }}
+        >
+          Powered by WellAI
+        </span>
+      )}
     </div>
   );
 }
