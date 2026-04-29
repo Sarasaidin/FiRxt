@@ -56,7 +56,7 @@ export function FeaturedPromotions({ promotions }: FeaturedPromotionsProps) {
                 <div className="flex flex-1 flex-col justify-between p-5">
                   <div>
                     <Badge
-                      variant="destructive"
+                      variant="red"
                       className="bg-red-100 text-brand-red hover:bg-red-100"
                     >
                       {discountText}
