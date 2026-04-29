@@ -10,13 +10,42 @@ import { Card } from "@/components/ui/card";
 
 const STEPS = ["Account", "Business", "Location", "Review"];
 
+type PartnerRegisterForm = {
+  name: string;
+  email: string;
+  password: string;
+  phone: string;
+  businessName: string;
+  type: string;
+  businessEmail: string;
+  businessPhone: string;
+  website: string;
+  description: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  state: string;
+  postcode: string;
+  latitude: number;
+  longitude: number;
+};
+
 export default function PartnerRegisterPage() {
   const router = useRouter();
+
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const { register, handleSubmit, watch, setValue } = useForm({
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    trigger,
+    formState: { errors },
+  } = useForm<PartnerRegisterForm>({
+    mode: "onTouched",
     defaultValues: {
       name: "",
       email: "",
@@ -38,82 +67,95 @@ export default function PartnerRegisterPage() {
     },
   });
 
+  const typeOptions = [
+    { value: "PHARMACY", label: "Community Pharmacy" },
+    { value: "CLINIC", label: "Medical Clinic" },
+  ];
+
+  async function goToNextStep(fields: (keyof PartnerRegisterForm)[], nextStep: number) {
+    const isValid = await trigger(fields, {
+      shouldFocus: true,
+    });
+
+    if (isValid) {
+      setStep(nextStep);
+    }
+  }
+
   function handleLocateMe() {
     if (!navigator.geolocation) return;
+
     navigator.geolocation.getCurrentPosition((pos) => {
       setValue("latitude", pos.coords.latitude);
       setValue("longitude", pos.coords.longitude);
     });
   }
 
-  async function onSubmit(data: any) {
+  async function onSubmit(data: PartnerRegisterForm) {
     setLoading(true);
     setError("");
 
-    const res = await fetch("/api/partners", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
+    try {
+      const response = await fetch("/api/partners", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
 
-    const json = await res.json();
-    setLoading(false);
+      const json = await response.json();
 
-    if (!res.ok) {
-      setError(json.error ?? "Registration failed");
-      return;
+      if (!response.ok) {
+        setError(json.error ?? "Registration failed. Please try again.");
+        return;
+      }
+
+      router.push("/partner-pending");
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    router.push("/partner-pending");
   }
 
-  const typeOptions = [
-    { value: "PHARMACY", label: "Community Pharmacy" },
-    { value: "CLINIC", label: "Medical Clinic" },
-  ];
-
   return (
-    <Card className="w-full max-w-2xl p-8">
+    <Card className="w-full max-w-3xl p-6">
       {/* Steps indicator */}
-      <div className="mb-8 flex items-center">
-        {STEPS.map((s, i) => (
-          <div key={s} className="flex items-center">
+      <div className="mb-8 flex items-center justify-between">
+        {STEPS.map((stepLabel, index) => (
+          <div key={stepLabel} className="flex flex-1 items-center">
             <div
-              className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-colors ${
-                i <= step
+              className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${
+                index <= step
                   ? "bg-brand-green text-white"
                   : "bg-gray-200 text-gray-500"
               }`}
             >
-              {i + 1}
+              {index + 1}
             </div>
 
             <span
-              className={`ml-2 hidden text-sm font-medium sm:block ${
-                i <= step ? "text-brand-navy" : "text-gray-400"
+              className={`ml-2 hidden text-sm font-medium sm:inline ${
+                index <= step ? "text-brand-navy" : "text-gray-400"
               }`}
             >
-              {s}
+              {stepLabel}
             </span>
 
-            {i < STEPS.length - 1 && (
-              <div
-                className={`mx-3 h-0.5 w-8 sm:w-16 ${
-                  i < step ? "bg-brand-green" : "bg-gray-200"
-                }`}
-              />
+            {index < STEPS.length - 1 && (
+              <div className="mx-4 h-px flex-1 bg-gray-200" />
             )}
           </div>
         ))}
       </div>
 
-      <p className="mb-4 text-sm text-gray-500">
-        Phase 1 partner onboarding is currently open for clinics and pharmacies
-        only.
+      <p className="mb-6 text-sm text-gray-600">
+        Phase 1 partner onboarding is currently open for clinics and pharmacies only.
       </p>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-brand-red">
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
@@ -127,42 +169,68 @@ export default function PartnerRegisterPage() {
             </h2>
 
             <Input
-              {...register("name")}
+              {...register("name", {
+                required: "Full name is required",
+              })}
               id="name"
               label="Your Full Name"
               placeholder="Ahmad bin Ali"
+              error={errors.name?.message}
               required
             />
 
             <Input
-              {...register("email")}
+              {...register("email", {
+                required: "Email address is required",
+                pattern: {
+                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                  message: "Enter a valid email address",
+                },
+              })}
               id="email"
-              type="email"
               label="Email Address"
+              type="email"
               placeholder="you@example.com"
+              error={errors.email?.message}
               required
             />
 
             <Input
-              {...register("phone")}
+              {...register("phone", {
+                required: "Phone number is required",
+                minLength: {
+                  value: 8,
+                  message: "Enter a valid phone number",
+                },
+              })}
               id="phone"
               label="Phone Number"
               placeholder="+60123456789"
+              error={errors.phone?.message}
               required
             />
 
             <Input
-              {...register("password")}
+              {...register("password", {
+                required: "Password is required",
+                minLength: {
+                  value: 8,
+                  message: "Password must be at least 8 characters",
+                },
+              })}
               id="password"
-              type="password"
               label="Password"
-              placeholder="••••••••"
+              type="password"
+              placeholder="Minimum 8 characters"
+              error={errors.password?.message}
               required
             />
 
             <Button
               type="button"
-              onClick={() => setStep(1)}
+              onClick={() =>
+                goToNextStep(["name", "email", "phone", "password"], 1)
+              }
               className="mt-2"
             >
               Next
@@ -178,51 +246,80 @@ export default function PartnerRegisterPage() {
             </h2>
 
             <Input
-              {...register("businessName")}
+              {...register("businessName", {
+                required: "Business name is required",
+              })}
               id="businessName"
               label="Business Name"
-              placeholder="My Pharmacy Sdn Bhd"
+              placeholder="Poliklinik Example"
+              error={errors.businessName?.message}
               required
             />
 
             <Select
-              {...register("type")}
+              {...register("type", {
+                required: "Business type is required",
+              })}
               id="type"
               label="Business Type"
               options={typeOptions}
+              error={errors.type?.message}
+              required
             />
 
             <Input
-              {...register("businessEmail")}
+              {...register("businessEmail", {
+                required: "Business email is required",
+                pattern: {
+                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                  message: "Enter a valid business email address",
+                },
+              })}
               id="businessEmail"
+              label="Business Email"
               type="email"
-              label="Business Email (optional)"
-              placeholder="contact@mybusiness.com"
+              placeholder="business@example.com"
+              error={errors.businessEmail?.message}
+              required
             />
 
             <Input
-              {...register("businessPhone")}
+              {...register("businessPhone", {
+                required: "Business phone is required",
+                minLength: {
+                  value: 8,
+                  message: "Enter a valid business phone number",
+                },
+              })}
               id="businessPhone"
-              label="Business Phone (optional)"
+              label="Business Phone"
               placeholder="+60312345678"
+              error={errors.businessPhone?.message}
+              required
             />
 
             <Input
               {...register("website")}
               id="website"
               label="Website (optional)"
-              placeholder="https://mybusiness.com"
+              placeholder="https://example.com"
+              error={errors.website?.message}
             />
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="description"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
                 Description
               </label>
+
               <textarea
                 {...register("description")}
-                rows={3}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-green focus:outline-none focus:ring-2 focus:ring-brand-green/20"
-                placeholder="Brief description of your business..."
+                id="description"
+                rows={4}
+                placeholder="Briefly describe your business"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-green focus:outline-none focus:ring-1 focus:ring-brand-green"
               />
             </div>
 
@@ -234,7 +331,16 @@ export default function PartnerRegisterPage() {
               >
                 Back
               </Button>
-              <Button type="button" onClick={() => setStep(2)}>
+
+              <Button
+                type="button"
+                onClick={() =>
+                  goToNextStep(
+                    ["businessName", "type", "businessEmail", "businessPhone"],
+                    2
+                  )
+                }
+              >
                 Next
               </Button>
             </div>
@@ -244,13 +350,18 @@ export default function PartnerRegisterPage() {
         {/* Step 2: Location */}
         {step === 2 && (
           <div className="flex flex-col gap-4">
-            <h2 className="text-xl font-bold text-brand-navy">Location</h2>
+            <h2 className="text-xl font-bold text-brand-navy">
+              Location
+            </h2>
 
             <Input
-              {...register("addressLine1")}
+              {...register("addressLine1", {
+                required: "Address line 1 is required",
+              })}
               id="addressLine1"
               label="Address Line 1"
               placeholder="No. 1, Jalan Example"
+              error={errors.addressLine1?.message}
               required
             />
 
@@ -259,31 +370,45 @@ export default function PartnerRegisterPage() {
               id="addressLine2"
               label="Address Line 2 (optional)"
               placeholder="Taman Example"
+              error={errors.addressLine2?.message}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input
-                {...register("city")}
+                {...register("city", {
+                  required: "City is required",
+                })}
                 id="city"
                 label="City"
                 placeholder="Kuala Lumpur"
+                error={errors.city?.message}
                 required
               />
 
               <Input
-                {...register("state")}
+                {...register("state", {
+                  required: "State is required",
+                })}
                 id="state"
                 label="State"
                 placeholder="Federal Territory of KL"
+                error={errors.state?.message}
                 required
               />
             </div>
 
             <Input
-              {...register("postcode")}
+              {...register("postcode", {
+                required: "Postcode is required",
+                minLength: {
+                  value: 4,
+                  message: "Enter a valid postcode",
+                },
+              })}
               id="postcode"
               label="Postcode"
               placeholder="50000"
+              error={errors.postcode?.message}
               required
             />
 
@@ -291,28 +416,35 @@ export default function PartnerRegisterPage() {
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 GPS Coordinates
               </label>
-              <div className="flex items-end gap-3">
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
                 <Input
-                  {...register("latitude", { valueAsNumber: true })}
+                  {...register("latitude", {
+                    valueAsNumber: true,
+                  })}
                   id="latitude"
                   label="Latitude"
                   placeholder="3.1390"
                   type="number"
                   step="any"
                 />
+
                 <Input
-                  {...register("longitude", { valueAsNumber: true })}
+                  {...register("longitude", {
+                    valueAsNumber: true,
+                  })}
                   id="longitude"
                   label="Longitude"
                   placeholder="101.6869"
                   type="number"
                   step="any"
                 />
+
                 <Button
                   type="button"
                   variant="outline"
                   onClick={handleLocateMe}
-                  className="flex-shrink-0"
+                  className="shrink-0"
                 >
                   Locate Me
                 </Button>
@@ -327,7 +459,16 @@ export default function PartnerRegisterPage() {
               >
                 Back
               </Button>
-              <Button type="button" onClick={() => setStep(3)}>
+
+              <Button
+                type="button"
+                onClick={() =>
+                  goToNextStep(
+                    ["addressLine1", "city", "state", "postcode"],
+                    3
+                  )
+                }
+              >
                 Next
               </Button>
             </div>
@@ -345,16 +486,27 @@ export default function PartnerRegisterPage() {
               <p>
                 <strong>Name:</strong> {watch("name")}
               </p>
+
               <p>
                 <strong>Email:</strong> {watch("email")}
               </p>
+
               <p>
                 <strong>Business:</strong> {watch("businessName")} (
                 {watch("type")})
               </p>
+
+              <p>
+                <strong>Business Email:</strong> {watch("businessEmail")}
+              </p>
+
+              <p>
+                <strong>Business Phone:</strong> {watch("businessPhone")}
+              </p>
+
               <p>
                 <strong>Address:</strong> {watch("addressLine1")},{" "}
-                {watch("city")}, {watch("state")}
+                {watch("city")}, {watch("state")} {watch("postcode")}
               </p>
             </div>
 
@@ -371,6 +523,7 @@ export default function PartnerRegisterPage() {
               >
                 Back
               </Button>
+
               <Button type="submit" loading={loading}>
                 Submit Application
               </Button>

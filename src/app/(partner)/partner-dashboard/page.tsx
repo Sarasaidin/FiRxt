@@ -92,79 +92,122 @@ export default async function PartnerDashboardPage() {
       </h1>
 
       {/* KPI Cards */}
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {[
           {
             label: "Revenue (30d)",
             value: formatCurrency(revenue30d),
             icon: DollarSign,
             color: "text-brand-green",
+            href: "/partner-dashboard/orders",
+            hint: "View paid orders",
           },
           {
             label: "Orders (30d)",
             value: orders30d.length,
             icon: ShoppingBag,
             color: "text-brand-navy",
+            href: "/partner-dashboard/orders",
+            hint: "View all orders",
           },
           {
             label: "Active Products",
             value: productCount,
             icon: Package,
             color: "text-blue-600",
+            href: "/partner-dashboard/products",
+            hint: "Manage products",
           },
           {
             label: "Active Services",
             value: serviceCount,
             icon: Stethoscope,
             color: "text-purple-600",
+            href: "/partner-dashboard/services",
+            hint: "Manage services",
           },
           {
             label: "Reviews",
             value: partner?._count.reviews ?? 0,
             icon: Star,
             color: "text-yellow-500",
+            href: "/partner-dashboard/storefront",
+            hint: "View storefront",
           },
-        ].map((kpi) => (
-          <Card key={kpi.label} className="p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-gray-500">{kpi.label}</p>
-                <p className="mt-1 text-2xl font-bold text-brand-navy">
-                  {kpi.value}
-                </p>
-              </div>
-              <kpi.icon className={`h-8 w-8 ${kpi.color} opacity-60`} />
-            </div>
-          </Card>
-        ))}
+        ].map((kpi) => {
+          const Icon = kpi.icon;
+
+          return (
+            <Link
+              key={kpi.label}
+              href={kpi.href}
+              aria-label={`${kpi.label}: ${kpi.hint}`}
+            >
+              <Card className="h-full cursor-pointer p-5 transition-all hover:-translate-y-0.5 hover:border-brand-green/40 hover:shadow-md">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">{kpi.label}</p>
+                    <p className="mt-2 text-2xl font-bold text-brand-navy">
+                      {kpi.value}
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-brand-green">
+                      {kpi.hint} →
+                    </p>
+                  </div>
+
+                  <Icon className={`h-6 w-6 ${kpi.color}`} />
+                </div>
+              </Card>
+            </Link>
+          );
+        })}
       </div>
 
       {/* Quick Actions */}
-      <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-        {[
-          {
-            href: "/partner-dashboard/products/new",
-            label: "Add Product",
-            desc: "List a new health product",
-          },
-          {
-            href: "/partner-dashboard/services/new",
-            label: "Add Service",
-            desc: "List a new service",
-          },
-          {
-            href: "/partner-dashboard/storefront",
-            label: "Edit Storefront",
-            desc: "Update your profile",
-          },
-        ].map((action) => (
-          <Link key={action.href} href={action.href}>
-            <Card className="cursor-pointer p-4 transition-all hover:border-brand-green/30 hover:shadow-md">
-              <p className="font-semibold text-brand-navy">{action.label}</p>
-              <p className="mt-1 text-xs text-gray-500">{action.desc}</p>
-            </Card>
-          </Link>
-        ))}
+      <div>
+        <h2 className="mb-3 text-lg font-semibold text-brand-navy">
+          Quick Actions
+        </h2>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {[
+            {
+              href: "/partner-dashboard/products/new",
+              label: "Add Product",
+              desc: "List a new health product",
+            },
+            {
+              href: "/partner-dashboard/services/new",
+              label: "Add Service",
+              desc: "List a new healthcare service",
+            },
+            {
+              href: "/partner-dashboard/storefront",
+              label: "Edit Storefront",
+              desc: "Update your business profile",
+            },
+          ].map((action) => (
+            <Link
+              key={action.href}
+              href={action.href}
+              aria-label={action.label}
+            >
+              <Card className="group h-full cursor-pointer border-dashed p-5 transition-all hover:-translate-y-0.5 hover:border-brand-green hover:bg-brand-green/5 hover:shadow-md">
+                <p className="text-base font-semibold text-brand-navy group-hover:text-brand-green">
+                  + {action.label}
+                </p>
+
+                <p className="mt-1 text-sm text-gray-500">
+                  {action.desc}
+                </p>
+
+                <p className="mt-3 text-xs font-medium text-brand-green">
+                  Click here to continue →
+                </p>
+              </Card>
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* Recent Orders */}

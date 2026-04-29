@@ -9,12 +9,19 @@ export async function GET(req: Request) {
   const sessionId = searchParams.get("session_id");
 
   if (!sessionId) {
-    return NextResponse.json({ error: "session_id required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "session_id required" },
+      { status: 400 }
+    );
   }
 
   const session = await getServerSession(authOptions);
+
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
   }
 
   const stripeSession = await stripe.checkout.sessions.retrieve(sessionId, {
@@ -22,15 +29,41 @@ export async function GET(req: Request) {
   });
 
   const order = await prisma.order.findUnique({
-    where: { stripeSessionId: sessionId },
+    where: {
+      stripeSessionId: sessionId,
+    },
     include: {
       items: {
         include: {
-          product: { select: { name: true, images: true } },
-          service: { select: { name: true, images: true } },
+          product: {
+            select: {
+              name: true,
+              images: true,
+            },
+          },
+          service: {
+            select: {
+              name: true,
+              images: true,
+            },
+          },
         },
       },
-      partner: { select: { name: true, slug: true } },
+      partner: {
+        select: {
+          name: true,
+          slug: true,
+        },
+      },
+      promotion: {
+        select: {
+          id: true,
+          title: true,
+          code: true,
+          type: true,
+          discountValue: true,
+        },
+      },
     },
   });
 

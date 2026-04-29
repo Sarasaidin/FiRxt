@@ -3,64 +3,94 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapPin, Search } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
-export function HomeHero() {
+export function HeroSearch() {
   const router = useRouter();
   const [query, setQuery] = useState("");
 
-  function handleLocateMe() {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((pos) => {
-      router.push(`/map?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`);
-    });
+  function handleSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const keyword = query.trim();
+
+    if (keyword) {
+      router.push(`/search?q=${encodeURIComponent(keyword)}`);
+    }
   }
 
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (query.trim()) router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+  function handleUseLocation() {
+    if (!navigator.geolocation) {
+      router.push("/map");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        router.push(
+          `/map?lat=${position.coords.latitude}&lng=${position.coords.longitude}`
+        );
+      },
+      () => {
+        router.push("/map");
+      }
+    );
   }
 
   return (
-    <div className="bg-teal-gradient border-b border-brand-teal/50 py-10 px-4">
-      <div className="mx-auto max-w-3xl text-center">
-        <h1 className="text-3xl font-bold text-brand-navy mb-2">
-          Reserve & Pay <span className="text-brand-green">Online</span>, Collect In Store
+    <section className="bg-teal-gradient px-4 py-16 text-center">
+      <div className="mx-auto max-w-4xl">
+        <h1 className="text-3xl font-bold text-brand-navy md:text-4xl">
+          Reserve & Pay{" "}
+          <span className="text-brand-green">Online</span>, Collect In Store
         </h1>
 
-        <p className="text-gray-600 mb-6">
-          Find trusted clinics and pharmacies near you. Reserve products or services online, then collect or attend in person.
+        <p className="mx-auto mt-4 max-w-2xl text-base text-gray-700 md:text-lg">
+          Find trusted clinics and pharmacies near you. Reserve products or
+          services online, then collect or attend in person.
         </p>
 
-        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3 max-w-xl mx-auto">
-          <div className="flex-1 flex items-center gap-2 rounded-xl bg-white border border-gray-200 shadow-sm px-4 py-2.5">
-            <Search className="h-4 w-4 text-gray-400 flex-shrink-0" />
-            <input
+        <form
+          onSubmit={handleSearch}
+          className="mx-auto mt-8 flex max-w-2xl flex-col gap-3 sm:flex-row"
+        >
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+
+            <Input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(event) => setQuery(event.target.value)}
               placeholder="Search clinics, pharmacies, products, services..."
-              className="flex-1 text-sm focus:outline-none text-gray-800 placeholder-gray-400"
+              className="h-14 rounded-xl pl-12 text-base"
             />
           </div>
-          <Button type="submit" size="lg" className="whitespace-nowrap">
+
+          <Button type="submit" className="h-14 rounded-xl px-8">
             Search
           </Button>
         </form>
 
-        <div className="mt-4 flex items-center justify-center gap-4">
+        <div className="mt-5 flex items-center justify-center gap-4 text-sm text-brand-navy">
           <button
-            onClick={handleLocateMe}
-            className="flex items-center gap-1.5 text-sm text-brand-navy hover:text-brand-green transition-colors"
+            type="button"
+            onClick={handleUseLocation}
+            className="inline-flex items-center gap-1 hover:text-brand-green"
           >
             <MapPin className="h-4 w-4" />
             Use my location
           </button>
+
           <span className="text-gray-300">|</span>
-          <a href="/map" className="text-sm text-brand-navy hover:text-brand-green transition-colors">
+
+          <Link href="/map" className="hover:text-brand-green">
             Browse on map
-          </a>
+          </Link>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
+
+export default HeroSearch;

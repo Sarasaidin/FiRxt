@@ -78,6 +78,14 @@ export function LoginForm() {
         <Button type="submit" loading={loading} className="w-full mt-2">
           Sign in
         </Button>
+        <div className="text-right text-sm">
+          <Link
+            href="/forgot-password"
+            className="font-medium text-brand-green hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </div>
       </form>
 
       <div className="mt-4 text-center text-sm text-gray-600">

@@ -10,7 +10,16 @@ import { PHASE1_PARTNER_TYPES } from "@/lib/phase1";
 
 function getTodayKey() {
   const day = new Date().getDay();
-  return ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"][day];
+
+  return [
+    "SUNDAY",
+    "MONDAY",
+    "TUESDAY",
+    "WEDNESDAY",
+    "THURSDAY",
+    "FRIDAY",
+    "SATURDAY",
+  ][day];
 }
 
 function toMinutes(value: string) {
@@ -36,53 +45,65 @@ function isPartnerOpenNow(operatingHours: any) {
 }
 
 interface Props {
-  searchParams: Promise<{ q?: string; type?: string; openNow?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    type?: string;
+    openNow?: string;
+  }>;
 }
 
 export async function generateMetadata({ searchParams }: Props) {
   const { q } = await searchParams;
-  return { title: q ? `Search: ${q}` : "Search" };
+
+  return {
+    title: q ? `Search: ${q}` : "Search",
+  };
 }
 
 export default async function SearchPage({ searchParams }: Props) {
   const { q, type, openNow } = await searchParams;
 
+  const searchQuery = q?.trim();
+  const normalizedQuery = searchQuery?.toLowerCase();
+
   const allowedType =
     type && PHASE1_PARTNER_TYPES.includes(type as any) ? type : undefined;
+
+  const hasActiveFilter = Boolean(searchQuery || allowedType || openNow === "true");
 
   const partnerWhere: any = {
     status: "APPROVED",
     type: { in: PHASE1_PARTNER_TYPES as any },
-};
+  };
 
   const productWhere: any = {
     isActive: true,
-};
+  };
 
   const serviceWhere: any = {
     isActive: true,
-};
+  };
 
   if (allowedType) {
     partnerWhere.type = allowedType;
   }
 
-  if (q) {
+  if (searchQuery) {
     partnerWhere.OR = [
-      { name: { contains: q, mode: "insensitive" } },
-      { city: { contains: q, mode: "insensitive" } },
-      { description: { contains: q, mode: "insensitive" } },
+      { name: { contains: searchQuery, mode: "insensitive" } },
+      { city: { contains: searchQuery, mode: "insensitive" } },
+      { description: { contains: searchQuery, mode: "insensitive" } },
     ];
 
     productWhere.OR = [
-      { name: { contains: q, mode: "insensitive" } },
-      { description: { contains: q, mode: "insensitive" } },
-      { brand: { contains: q, mode: "insensitive" } },
+      { name: { contains: searchQuery, mode: "insensitive" } },
+      { description: { contains: searchQuery, mode: "insensitive" } },
+      { brand: { contains: searchQuery, mode: "insensitive" } },
     ];
 
     serviceWhere.OR = [
-      { name: { contains: q, mode: "insensitive" } },
-      { description: { contains: q, mode: "insensitive" } },
+      { name: { contains: searchQuery, mode: "insensitive" } },
+      { description: { contains: searchQuery, mode: "insensitive" } },
     ];
   }
 
@@ -106,7 +127,7 @@ export default async function SearchPage({ searchParams }: Props) {
       take: 20,
     }),
 
-    q
+    searchQuery
       ? prisma.product.findMany({
           where: {
             ...productWhere,
@@ -134,7 +155,7 @@ export default async function SearchPage({ searchParams }: Props) {
         })
       : [],
 
-    q
+    searchQuery
       ? prisma.service.findMany({
           where: {
             ...serviceWhere,
@@ -165,98 +186,115 @@ export default async function SearchPage({ searchParams }: Props) {
 
   const partners =
     openNow === "true"
-      ? rawPartners.filter((partner) => isPartnerOpenNow(partner.operatingHours))
+      ? rawPartners.filter((partner) =>
+          isPartnerOpenNow(partner.operatingHours)
+        )
       : rawPartners;
 
-  const pageTitle = q
-    ? `Results for "${q}"`
+  const pageTitle = searchQuery
+    ? `Results for "${searchQuery}"`
+    : openNow === "true"
+    ? "Open Now"
     : allowedType === "PHARMACY"
     ? "Pharmacies"
     : allowedType === "CLINIC"
     ? "Clinics"
     : "Clinics & Pharmacies";
 
+  const filterTabs = [
+    {
+      label: "All",
+      href: "/search",
+      active: !searchQuery && !allowedType && openNow !== "true",
+    },
+    {
+      label: "Pharmacies",
+      href: "/search?type=PHARMACY",
+      active: allowedType === "PHARMACY",
+    },
+    {
+      label: "Clinics",
+      href: "/search?type=CLINIC",
+      active: allowedType === "CLINIC",
+    },
+    {
+      label: "Blood Tests",
+      href: "/search?q=blood%20test",
+      active: normalizedQuery === "blood test",
+    },
+    {
+      label: "Vaccinations",
+      href: "/search?q=vaccination",
+      active: normalizedQuery === "vaccination",
+    },
+    {
+      label: "Health Screening",
+      href: "/search?q=health%20screening",
+      active: normalizedQuery === "health screening",
+    },
+    {
+      label: "Open Now",
+      href: "/search?openNow=true",
+      active: openNow === "true",
+    },
+  ];
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      <h1 className="text-2xl font-bold text-brand-navy mb-1">{pageTitle}</h1>
+    <div className="mx-auto max-w-7xl px-4 py-10">
+      <div className="mb-8 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-brand-navy">
+              {pageTitle}
+            </h1>
 
-      <p className="text-gray-500 text-sm mb-6">
-        {partners.length} partners, {products.length} products, {services.length} services found
-      </p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <p className="text-sm text-gray-500">
+                {partners.length} partners, {products.length} products,{" "}
+                {services.length} services found
+              </p>
 
-    <div className="mb-6 flex flex-wrap gap-2">
-      <Link
-        href={`/search${
-          q || openNow
-            ? `?${new URLSearchParams({
-                ...(q ? { q } : {}),
-                ...(openNow ? { openNow } : {}),
-              }).toString()}`
-            : ""
-        }`}
-        className={`rounded-full px-3 py-1.5 text-sm border ${
-          !allowedType
-            ? "border-brand-green bg-brand-green text-white"
-            : "border-gray-300 text-gray-600 hover:border-brand-green"
-        }`}
-      >
-        All
-      </Link>
+              {hasActiveFilter && (
+                <Link
+                  href="/search"
+                  className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 transition-all hover:border-brand-green hover:text-brand-green"
+                >
+                  Clear filters
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
 
-      <Link
-        href={`/search?${new URLSearchParams({
-          ...(q ? { q } : {}),
-          ...(openNow ? { openNow } : {}),
-          type: "PHARMACY",
-        }).toString()}`}
-        className={`rounded-full px-3 py-1.5 text-sm border ${
-          allowedType === "PHARMACY"
-            ? "border-brand-green bg-brand-green text-white"
-            : "border-gray-300 text-gray-600 hover:border-brand-green"
-        }`}
-      >
-        Pharmacy
-      </Link>
-
-      <Link
-        href={`/search?${new URLSearchParams({
-          ...(q ? { q } : {}),
-          ...(openNow ? { openNow } : {}),
-          type: "CLINIC",
-        }).toString()}`}
-        className={`rounded-full px-3 py-1.5 text-sm border ${
-          allowedType === "CLINIC"
-            ? "border-brand-green bg-brand-green text-white"
-            : "border-gray-300 text-gray-600 hover:border-brand-green"
-        }`}
-      >
-        Clinic
-      </Link>
-    
-      <Link
-        href={`/search?${new URLSearchParams({
-          ...(q ? { q } : {}),
-          ...(allowedType ? { type: allowedType } : {}),
-          openNow: openNow === "true" ? "false" : "true",
-        }).toString()}`}
-        className={`rounded-full px-3 py-1.5 text-sm border ${
-          openNow === "true"
-            ? "border-brand-green bg-brand-green text-white"
-            : "border-gray-300 text-gray-600 hover:border-brand-green"
-        }`}
-      >
-        Open Now
-      </Link>
-
-    </div>
+        <div className="mt-6 overflow-x-auto">
+          <div className="flex min-w-max gap-2">
+            {filterTabs.map((tab) => (
+              <Link
+                key={tab.label}
+                href={tab.href}
+                className={`rounded-full border px-4 py-2 text-sm font-medium transition-all ${
+                  tab.active
+                    ? "border-brand-green bg-brand-green text-white shadow-sm"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-brand-green hover:text-brand-green"
+                }`}
+              >
+                {tab.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Partners */}
       {partners.length > 0 && (
         <section className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3">Partners</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {partners.map((p) => (
-              <PartnerCard key={p.id} {...p} />
+          <h2 className="mb-3 text-lg font-semibold text-gray-800">
+            Partners
+          </h2>
+
+          <div className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {partners.map((partner) => (
+              <PartnerCard key={partner.id} {...partner} />
             ))}
           </div>
         </section>
@@ -265,33 +303,43 @@ export default async function SearchPage({ searchParams }: Props) {
       {/* Products */}
       {products.length > 0 && (
         <section className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3">Products</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {products.map((product) => (
-              <Link key={product.id} href={`/partner/${product.partner.slug}`}>
-                <Card className="overflow-hidden hover:shadow-md transition-shadow">
-                  {product.images?.[0] ? (
-                    <Image
-                      src={product.images[0]}
-                      alt={product.name}
-                      width={300}
-                      height={180}
-                      className="w-full h-36 object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-36 bg-gray-100 flex items-center justify-center text-gray-400">
-                      💊
-                    </div>
-                  )}
+          <h2 className="mb-3 text-lg font-semibold text-gray-800">
+            Products
+          </h2>
 
-                  <div className="p-3">
-                    <p className="text-sm font-semibold text-brand-navy line-clamp-2">
+          <div className="grid auto-rows-fr grid-cols-2 gap-4 md:grid-cols-4">
+            {products.map((product) => (
+              <Link
+                key={product.id}
+                href={`/partner/${product.partner.slug}`}
+                className="block h-full"
+              >
+                <Card className="group flex h-full min-h-[270px] flex-col overflow-hidden transition-all hover:-translate-y-0.5 hover:border-brand-green/40 hover:shadow-md">
+                  <div className="relative h-36 w-full overflow-hidden bg-gray-100">
+                    {product.images?.[0] ? (
+                      <Image
+                        src={product.images[0]}
+                        alt={product.name}
+                        fill
+                        className="object-cover transition-transform group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-3xl text-gray-400">
+                        💊
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-1 flex-col p-4">
+                    <p className="line-clamp-2 text-sm font-semibold text-brand-navy group-hover:text-brand-green">
                       {product.name}
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
+
+                    <p className="mt-1 line-clamp-1 text-xs text-gray-500">
                       {product.partner.name}
                     </p>
-                    <p className="font-bold text-brand-green mt-1">
+
+                    <p className="mt-auto pt-4 text-base font-bold text-brand-green">
                       {formatCurrency(product.price)}
                     </p>
                   </div>
@@ -304,34 +352,44 @@ export default async function SearchPage({ searchParams }: Props) {
 
       {/* Services */}
       {services.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold text-gray-800 mb-3">Services</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {services.map((service) => (
-              <Link key={service.id} href={`/partner/${service.partner.slug}`}>
-                <Card className="overflow-hidden hover:shadow-md transition-shadow">
-                  {service.images?.[0] ? (
-                    <Image
-                      src={service.images[0]}
-                      alt={service.name}
-                      width={300}
-                      height={180}
-                      className="w-full h-36 object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-36 bg-gray-100 flex items-center justify-center text-gray-400">
-                      🏥
-                    </div>
-                  )}
+        <section className="mb-8">
+          <h2 className="mb-3 text-lg font-semibold text-gray-800">
+            Services
+          </h2>
 
-                  <div className="p-3">
-                    <p className="text-sm font-semibold text-brand-navy line-clamp-2">
+          <div className="grid auto-rows-fr grid-cols-2 gap-4 md:grid-cols-4">
+            {services.map((service) => (
+              <Link
+                key={service.id}
+                href={`/partner/${service.partner.slug}`}
+                className="block h-full"
+              >
+                <Card className="group flex h-full min-h-[270px] flex-col overflow-hidden transition-all hover:-translate-y-0.5 hover:border-brand-green/40 hover:shadow-md">
+                  <div className="relative h-36 w-full overflow-hidden bg-gray-100">
+                    {service.images?.[0] ? (
+                      <Image
+                        src={service.images[0]}
+                        alt={service.name}
+                        fill
+                        className="object-cover transition-transform group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-3xl text-gray-400">
+                        🏥
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-1 flex-col p-4">
+                    <p className="line-clamp-2 text-sm font-semibold text-brand-navy group-hover:text-brand-green">
                       {service.name}
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
+
+                    <p className="mt-1 line-clamp-1 text-xs text-gray-500">
                       {service.partner.name}
                     </p>
-                    <p className="font-bold text-brand-green mt-1">
+
+                    <p className="mt-auto pt-4 text-base font-bold text-brand-green">
                       {formatCurrency(service.price)}
                     </p>
                   </div>
@@ -342,17 +400,24 @@ export default async function SearchPage({ searchParams }: Props) {
         </section>
       )}
 
-      {partners.length === 0 && products.length === 0 && services.length === 0 && (
-        <Card className="p-12 text-center">
-          <p className="text-gray-500 text-lg">No results found.</p>
-          <p className="text-gray-400 text-sm mt-2">
-            Try different keywords or browse all partners.
-          </p>
-          <Link href="/" className="mt-4 inline-block text-brand-green hover:underline text-sm">
-            Browse all partners
-          </Link>
-        </Card>
-      )}
+      {partners.length === 0 &&
+        products.length === 0 &&
+        services.length === 0 && (
+          <Card className="p-12 text-center">
+            <p className="text-lg text-gray-500">No results found.</p>
+
+            <p className="mt-2 text-sm text-gray-400">
+              Try different keywords or browse all partners.
+            </p>
+
+            <Link
+              href="/"
+              className="mt-4 inline-block text-sm text-brand-green hover:underline"
+            >
+              Browse all partners
+            </Link>
+          </Card>
+        )}
     </div>
   );
 }

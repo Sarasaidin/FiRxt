@@ -39,48 +39,50 @@ export function PartnerCard({
       : "Lab";
 
   return (
-    <Link href={`/partner/${slug}`}>
-      <Card className="flex items-start gap-4 p-4 hover:shadow-md hover:border-brand-green/30 transition-all cursor-pointer group">
+    <Link href={`/partner/${slug}`} className="block h-full">
+      <Card className="group flex h-full min-h-[145px] items-start gap-4 p-4 transition-all hover:-translate-y-0.5 hover:border-brand-green/40 hover:shadow-md">
         {/* Logo */}
-        <div className="flex-shrink-0 h-16 w-16 rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+        <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-brand-navy text-xl font-bold text-white">
           {logoUrl ? (
             <Image
               src={logoUrl}
               alt={name}
-              width={64}
-              height={64}
-              className="h-full w-full object-cover"
+              fill
+              className="object-cover"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-brand-navy text-white text-xl font-bold">
-              {name.charAt(0)}
-            </div>
+            <span>{name.charAt(0)}</span>
           )}
         </div>
 
         {/* Info */}
-        <div className="flex-1 min-w-0">
+        <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold text-brand-green group-hover:text-brand-green-dark transition-colors truncate">
+            <h3 className="line-clamp-1 font-semibold text-brand-navy group-hover:text-brand-green">
               {name}
             </h3>
+
             {isVerified && (
-              <Badge variant="blue" className="flex-shrink-0 text-xs">
+              <Badge className="shrink-0 bg-blue-100 text-blue-700 hover:bg-blue-100">
                 Verified
               </Badge>
             )}
           </div>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {typeLabel}
-          </p>
-          <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-            {addressLine1}, {city}, {state}
-          </p>
+
+          <p className="mt-1 text-sm text-gray-500">{typeLabel}</p>
+
+          <div className="mt-2 flex items-start gap-1 text-sm text-gray-500">
+            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+
+            <p className="line-clamp-2">
+              {addressLine1}, {city}, {state}
+            </p>
+          </div>
+
           {distanceMeters !== undefined && (
-            <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
-              <MapPin className="h-3 w-3" />
-              <span>{formatDistance(distanceMeters)}</span>
-            </div>
+            <p className="mt-auto pt-3 text-sm font-medium text-brand-green">
+              {formatDistance(distanceMeters)}
+            </p>
           )}
         </div>
       </Card>

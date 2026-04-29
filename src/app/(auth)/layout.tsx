@@ -9,8 +9,9 @@ export default function AuthLayout({
   return (
     <div className="min-h-screen bg-teal-gradient flex flex-col items-center justify-center p-4">
       <Link href="/" className="mb-8">
-        <FiRxtLogoDark />
+        <FiRxtLogoDark showPoweredBy />
       </Link>
+
       {children}
     </div>
   );

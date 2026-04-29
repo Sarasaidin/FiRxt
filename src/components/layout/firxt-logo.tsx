@@ -53,10 +53,14 @@ export function FiRxtLogo({
 
         {showPoweredBy && (
           <p
-            className="mt-1 text-[10px] font-bold leading-none text-black/80"
-            style={{ fontFamily: "Futura Std Heavy,Russo One, sans-serif", fontWeight: 800  }}
+            className="mt-1 text-[10px] font-bold leading-none"
+            style={{
+              fontFamily: "Futura Std Heavy, Russo One, sans-serif",
+              fontWeight: 800,
+            }}
           >
-            Powered by <span className="text-[#712B87]">WellAI</span>
+            <span className="text-white">Powered by </span>
+            <span className="text-[#712B87]">WellAI</span>
           </p>
         )}
       </div>
@@ -83,10 +87,10 @@ export function FiRxtBrandCard({
     <div className={cn("inline-flex flex-col items-center", className)}>
       <div className="inline-flex items-center rounded-[999px] bg-[#0B1D3B] px-14 py-8 shadow-sm">
         <span
-          className="text-[110px] font-black leading-none tracking-[-0.05em]"
+          className="text-[80px] font-black leading-none tracking-[-0.05em]"
           style={{
             fontFamily:
-              "Futura Std Heavy, Russo One, Arial Black, sans-serif",
+              "Futura Std Heavy, Russo One, sans-serif",
             WebkitTextStroke: "3.5px white",
           }}
         >
@@ -98,13 +102,13 @@ export function FiRxtBrandCard({
 
       {showPoweredBy && (
         <div
-          className="mt-3 text-center text-[44px] font-black leading-none tracking-[-0.03em]"
+          className="mt-3 text-center text-[24px] font-black leading-none tracking-[-0.03em]"
           style={{
             fontFamily:
               "Russo One, Futura Std Heavy, Arial Black, sans-serif",
           }}
         >
-          <span className="text-black">Powered by </span>
+          <span className="text[#0B1D3B]">Powered by </span>
           <span className="text-[#712B87]">WellAI</span>
         </div>
       )}
