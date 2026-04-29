@@ -12,12 +12,16 @@ import {
   CheckCircle2,
   XCircle,
   TicketPercent,
+  Truck,
+  Store,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useSession } from "next-auth/react";
+
+type FulfillmentType = "PICKUP" | "DELIVERY";
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, subtotal, clearCart } =
@@ -29,10 +33,14 @@ export default function CartPage() {
   const [promoCode, setPromoCode] = useState("");
   const [appliedPromoCode, setAppliedPromoCode] = useState("");
   const [promoMessage, setPromoMessage] = useState("");
+  const [fulfillmentType, setFulfillmentType] =
+    useState<FulfillmentType>("PICKUP");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const total = subtotal();
+
+  const hasServiceItem = items.some((item) => item.type === "SERVICE");
 
   function handleApplyPromo() {
     const code = promoCode.trim().toUpperCase();
@@ -56,6 +64,19 @@ export default function CartPage() {
     setPromoCode("");
     setPromoMessage("");
     setError("");
+  }
+
+  function handleFulfillmentChange(type: FulfillmentType) {
+    setError("");
+
+    if (type === "DELIVERY" && hasServiceItem) {
+      setError(
+        "Home Delivery is only available for products. Services must be reserved and attended in person."
+      );
+      return;
+    }
+
+    setFulfillmentType(type);
   }
 
   async function handleCheckout() {
@@ -85,6 +106,13 @@ export default function CartPage() {
       return;
     }
 
+    if (fulfillmentType === "DELIVERY" && hasServiceItem) {
+      setError(
+        "Home Delivery is only available for products. Please choose Reserve & Collect."
+      );
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
@@ -96,6 +124,7 @@ export default function CartPage() {
         },
         body: JSON.stringify({
           partnerId,
+          fulfillmentType,
           items: items.map((item) => ({
             id: item.id,
             type: item.type,
@@ -252,6 +281,75 @@ export default function CartPage() {
               Order Summary
             </h2>
 
+            {/* Fulfilment option */}
+            <div className="mb-5">
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                Fulfilment option
+              </label>
+
+              <div className="grid grid-cols-1 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleFulfillmentChange("PICKUP")}
+                  className={`rounded-xl border p-4 text-left transition-all ${
+                    fulfillmentType === "PICKUP"
+                      ? "border-brand-green bg-green-50"
+                      : "border-gray-200 bg-white hover:border-brand-green"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <Store className="mt-0.5 h-5 w-5 text-brand-green" />
+
+                    <div>
+                      <p className="font-semibold text-brand-navy">
+                        Reserve & Collect
+                      </p>
+
+                      <p className="mt-1 text-xs text-gray-500">
+                        Reserve or pay online, then collect items or attend the
+                        service in person.
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleFulfillmentChange("DELIVERY")}
+                  disabled={hasServiceItem}
+                  className={`rounded-xl border p-4 text-left transition-all ${
+                    fulfillmentType === "DELIVERY"
+                      ? "border-brand-green bg-green-50"
+                      : "border-gray-200 bg-white hover:border-brand-green"
+                  } ${
+                    hasServiceItem
+                      ? "cursor-not-allowed opacity-50"
+                      : ""
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <Truck className="mt-0.5 h-5 w-5 text-brand-green" />
+
+                    <div>
+                      <p className="font-semibold text-brand-navy">
+                        Home Delivery
+                      </p>
+
+                      <p className="mt-1 text-xs text-gray-500">
+                        Deliver eligible products to your address.
+                      </p>
+
+                      {hasServiceItem && (
+                        <p className="mt-1 text-xs text-brand-red">
+                          Not available for services.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
             {/* Voucher input */}
             <div className="mb-4">
               <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -332,8 +430,10 @@ export default function CartPage() {
 
               <div className="flex justify-between">
                 <span>Fulfilment</span>
-                <span className="text-brand-green">
-                  In-store collection / visit
+                <span className="text-right text-brand-green">
+                  {fulfillmentType === "PICKUP"
+                    ? "Reserve & Collect"
+                    : "Home Delivery"}
                 </span>
               </div>
             </div>

@@ -14,7 +14,6 @@ import {
   ShoppingCart,
   Menu,
   X,
-  Store,
 } from "lucide-react";
 import { useCartStore } from "@/store/cart-store";
 import { FiRxtLogo } from "./firxt-logo";
@@ -92,12 +91,6 @@ export function Navbar() {
         <Link href="/" className="shrink-0" aria-label="FiRxt home">
           <FiRxtLogo showTagline showPoweredBy />
         </Link>
-
-        {/* Fulfilment label */}
-        <div className="hidden items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white md:flex">
-          <Store className="h-4 w-4" />
-          <span>Reserve & Collect</span>
-        </div>
 
         {/* Search bar */}
         <form
@@ -292,13 +285,6 @@ export function Navbar() {
               <Search className="h-4 w-4" />
             </button>
           </form>
-
-          <div className="mt-3 rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-sm text-white/90">
-            <div className="flex items-center gap-2">
-              <Store className="h-4 w-4" />
-              <span>Reserve online, collect in store</span>
-            </div>
-          </div>
 
           <nav className="mt-3 flex flex-col gap-3 text-sm">
             <Link
