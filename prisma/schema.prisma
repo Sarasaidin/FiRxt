@@ -43,6 +43,7 @@ enum OrderStatus {
 enum FulfillmentType {
   IN_STORE_PICKUP
   IN_STORE_VISIT
+  HOME_DELIVERY
 }
 
 enum PaymentStatus {

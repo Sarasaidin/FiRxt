@@ -18,10 +18,10 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 
-type FulfillmentType = "PICKUP" | "DELIVERY";
+type FulfillmentType = "IN_STORE_PICKUP" | "HOME_DELIVERY";
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, subtotal, clearCart } =
@@ -34,13 +34,18 @@ export default function CartPage() {
   const [appliedPromoCode, setAppliedPromoCode] = useState("");
   const [promoMessage, setPromoMessage] = useState("");
   const [fulfillmentType, setFulfillmentType] =
-    useState<FulfillmentType>("PICKUP");
+    useState<FulfillmentType>("IN_STORE_PICKUP");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const total = subtotal();
-
   const hasServiceItem = items.some((item) => item.type === "SERVICE");
+
+  useEffect(() => {
+    if (hasServiceItem && fulfillmentType === "HOME_DELIVERY") {
+      setFulfillmentType("IN_STORE_PICKUP");
+    }
+  }, [hasServiceItem, fulfillmentType]);
 
   function handleApplyPromo() {
     const code = promoCode.trim().toUpperCase();
@@ -69,7 +74,7 @@ export default function CartPage() {
   function handleFulfillmentChange(type: FulfillmentType) {
     setError("");
 
-    if (type === "DELIVERY" && hasServiceItem) {
+    if (type === "HOME_DELIVERY" && hasServiceItem) {
       setError(
         "Home Delivery is only available for products. Services must be reserved and attended in person."
       );
@@ -106,7 +111,7 @@ export default function CartPage() {
       return;
     }
 
-    if (fulfillmentType === "DELIVERY" && hasServiceItem) {
+    if (fulfillmentType === "HOME_DELIVERY" && hasServiceItem) {
       setError(
         "Home Delivery is only available for products. Please choose Reserve & Collect."
       );
@@ -290,9 +295,11 @@ export default function CartPage() {
               <div className="grid grid-cols-1 gap-3">
                 <button
                   type="button"
-                  onClick={() => handleFulfillmentChange("PICKUP")}
+                  onClick={() =>
+                    handleFulfillmentChange("IN_STORE_PICKUP")
+                  }
                   className={`rounded-xl border p-4 text-left transition-all ${
-                    fulfillmentType === "PICKUP"
+                    fulfillmentType === "IN_STORE_PICKUP"
                       ? "border-brand-green bg-green-50"
                       : "border-gray-200 bg-white hover:border-brand-green"
                   }`}
@@ -315,16 +322,16 @@ export default function CartPage() {
 
                 <button
                   type="button"
-                  onClick={() => handleFulfillmentChange("DELIVERY")}
+                  onClick={() =>
+                    handleFulfillmentChange("HOME_DELIVERY")
+                  }
                   disabled={hasServiceItem}
                   className={`rounded-xl border p-4 text-left transition-all ${
-                    fulfillmentType === "DELIVERY"
+                    fulfillmentType === "HOME_DELIVERY"
                       ? "border-brand-green bg-green-50"
                       : "border-gray-200 bg-white hover:border-brand-green"
                   } ${
-                    hasServiceItem
-                      ? "cursor-not-allowed opacity-50"
-                      : ""
+                    hasServiceItem ? "cursor-not-allowed opacity-50" : ""
                   }`}
                 >
                   <div className="flex items-start gap-3">
@@ -431,7 +438,7 @@ export default function CartPage() {
               <div className="flex justify-between">
                 <span>Fulfilment</span>
                 <span className="text-right text-brand-green">
-                  {fulfillmentType === "PICKUP"
+                  {fulfillmentType === "IN_STORE_PICKUP"
                     ? "Reserve & Collect"
                     : "Home Delivery"}
                 </span>

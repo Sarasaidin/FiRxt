@@ -60,13 +60,27 @@ function getItemName(item: CheckoutOrderItem) {
 }
 
 function getFulfilmentLabel(value?: string | null) {
-  if (!value) return "In-store collection / visit";
+  if (!value) return "Reserve & Collect";
 
-  if (value === "PICKUP") return "In-store collection";
+  if (value === "IN_STORE_PICKUP") return "Reserve & Collect";
+  if (value === "IN_STORE_VISIT") return "Attend appointment in person";
+  if (value === "HOME_DELIVERY") return "Home Delivery";
+
+  // Fallback for old saved values, just in case older orders still use these.
+  if (value === "PICKUP") return "Reserve & Collect";
   if (value === "BOOKING") return "Attend appointment in person";
-  if (value === "DELIVERY") return "Delivery";
+  if (value === "DELIVERY") return "Home Delivery";
 
-  return "In-store collection / visit";
+  return "Reserve & Collect";
+}
+
+function getOrderStatusLabel(value?: string | null) {
+  if (!value) return "Confirmed";
+
+  return value
+    .replaceAll("_", " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 export function CheckoutSuccessContent() {
@@ -158,6 +172,7 @@ export function CheckoutSuccessContent() {
   const discountAmount = order.discountAmount ?? 0;
   const finalTotal = order.total;
   const hasVoucher = Boolean(order.promotion || discountAmount > 0);
+  const fulfilmentLabel = getFulfilmentLabel(order.fulfillmentType);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
@@ -179,7 +194,6 @@ export function CheckoutSuccessContent() {
         </div>
 
         <div className="grid gap-6 p-6 lg:grid-cols-3">
-          {/* Left: order details */}
           <div className="space-y-6 lg:col-span-2">
             <div>
               <h2 className="mb-3 text-lg font-bold text-brand-navy">
@@ -214,7 +228,7 @@ export function CheckoutSuccessContent() {
                   </div>
 
                   <p className="mt-1 font-semibold text-brand-navy">
-                    {getFulfilmentLabel(order.fulfillmentType)}
+                    {fulfilmentLabel}
                   </p>
                 </div>
 
@@ -235,9 +249,8 @@ export function CheckoutSuccessContent() {
                     Order Status
                   </div>
 
-                  <p className="mt-1 font-semibold capitalize text-brand-navy">
-                    {order.status?.replaceAll("_", " ").toLowerCase() ||
-                      "Confirmed"}
+                  <p className="mt-1 font-semibold text-brand-navy">
+                    {getOrderStatusLabel(order.status)}
                   </p>
                 </div>
               </div>
@@ -274,7 +287,6 @@ export function CheckoutSuccessContent() {
             </div>
           </div>
 
-          {/* Right: payment summary */}
           <div>
             <Card className="p-5">
               <h2 className="mb-4 font-bold text-brand-navy">
@@ -323,7 +335,7 @@ export function CheckoutSuccessContent() {
                 <div className="flex justify-between text-gray-600">
                   <span>Fulfilment</span>
                   <span className="text-right text-brand-green">
-                    {getFulfilmentLabel(order.fulfillmentType)}
+                    {fulfilmentLabel}
                   </span>
                 </div>
 
@@ -351,3 +363,5 @@ export function CheckoutSuccessContent() {
     </div>
   );
 }
+
+export default CheckoutSuccessContent;
