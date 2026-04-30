@@ -120,7 +120,7 @@ export default async function PartnerStorefrontPage({ params }: Props) {
         <Card className="mb-6 p-4">
           <p className="text-sm text-gray-700">
             {partner.type === "PHARMACY"
-              ? "Reserve and pay online, then collect your items in store."
+              ? "Reserve and pay online, then collect your items in store or choose home delivery at checkout."
               : "Reserve and pay online, then attend your appointment at the clinic."}
           </p>
         </Card>
@@ -131,12 +131,14 @@ export default async function PartnerStorefrontPage({ params }: Props) {
             <h2 className="mb-3 text-lg font-semibold text-gray-800">
               Promotions
             </h2>
+
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {partner.promotions.map((promo) => (
                 <Card key={promo.id} className="p-4">
                   <h3 className="font-semibold text-brand-navy">
                     {promo.title}
                   </h3>
+
                   {promo.description && (
                     <p className="mt-1 text-sm text-gray-600">
                       {promo.description}
@@ -161,11 +163,11 @@ export default async function PartnerStorefrontPage({ params }: Props) {
                 No products available yet.
               </Card>
             ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2">
                 {partner.products.map((product) => (
                   <Card
                     key={product.id}
-                    className="overflow-hidden transition-shadow hover:shadow-md"
+                    className="flex h-full flex-col overflow-hidden transition-shadow hover:shadow-md"
                   >
                     {product.images?.[0] ? (
                       <Image
@@ -181,36 +183,40 @@ export default async function PartnerStorefrontPage({ params }: Props) {
                       </div>
                     )}
 
-                    <div className="p-4">
-                      <h3 className="line-clamp-2 font-semibold text-brand-navy">
-                        {product.name}
-                      </h3>
+                    <div className="flex flex-1 flex-col p-4">
+                      <div>
+                        <h3 className="line-clamp-2 min-h-[48px] font-semibold leading-6 text-brand-navy">
+                          {product.name}
+                        </h3>
 
-                      {product.description && (
-                        <p className="mt-1 line-clamp-2 text-sm text-gray-600">
-                          {product.description}
+                        <p className="mt-1 line-clamp-3 min-h-[60px] text-sm leading-5 text-gray-600">
+                          {product.description || "No description available."}
                         </p>
-                      )}
+                      </div>
 
-                      <p className="mt-2 font-bold text-brand-green">
-                        {formatCurrency(product.price)}
-                      </p>
+                      <div className="mt-auto pt-3">
+                        <p className="font-bold text-brand-green">
+                          {formatCurrency(product.price)}
+                        </p>
 
-                      <p className="mt-1 text-xs text-gray-500">
-                        Stock: {product.stock}
-                      </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Stock: {product.stock}
+                        </p>
 
-                      <AddToCartButton
-                        id={product.id}
-                        name={product.name}
-                        price={product.price}
-                        type="PHYSICAL"
-                        image={product.images?.[0]}
-                        partnerId={partner.id}
-                        partnerName={partner.name}
-                        partnerSlug={partner.slug}
-                        stock={product.stock}
-                      />
+                        <div className="mt-3">
+                          <AddToCartButton
+                            id={product.id}
+                            name={product.name}
+                            price={product.price}
+                            type="PHYSICAL"
+                            image={product.images?.[0]}
+                            partnerId={partner.id}
+                            partnerName={partner.name}
+                            partnerSlug={partner.slug}
+                            stock={product.stock}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </Card>
                 ))}
@@ -229,11 +235,11 @@ export default async function PartnerStorefrontPage({ params }: Props) {
                 No services available yet.
               </Card>
             ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2">
                 {partner.services.map((service) => (
                   <Card
                     key={service.id}
-                    className="overflow-hidden transition-shadow hover:shadow-md"
+                    className="flex h-full flex-col overflow-hidden transition-shadow hover:shadow-md"
                   >
                     {service.images?.[0] ? (
                       <Image
@@ -249,37 +255,41 @@ export default async function PartnerStorefrontPage({ params }: Props) {
                       </div>
                     )}
 
-                    <div className="p-4">
-                      <h3 className="line-clamp-2 font-semibold text-brand-navy">
-                        {service.name}
-                      </h3>
+                    <div className="flex flex-1 flex-col p-4">
+                      <div>
+                        <h3 className="line-clamp-2 min-h-[48px] font-semibold leading-6 text-brand-navy">
+                          {service.name}
+                        </h3>
 
-                      {service.description && (
-                        <p className="mt-1 line-clamp-2 text-sm text-gray-600">
-                          {service.description}
+                        <p className="mt-1 line-clamp-3 min-h-[60px] text-sm leading-5 text-gray-600">
+                          {service.description || "No description available."}
                         </p>
-                      )}
+                      </div>
 
-                      <p className="mt-2 font-bold text-brand-green">
-                        {formatCurrency(service.price)}
-                      </p>
-
-                      {service.durationMinutes && (
-                        <p className="mt-1 text-xs text-gray-500">
-                          Duration: {service.durationMinutes} mins
+                      <div className="mt-auto pt-3">
+                        <p className="font-bold text-brand-green">
+                          {formatCurrency(service.price)}
                         </p>
-                      )}
 
-                      <AddToCartButton
-                        id={service.id}
-                        name={service.name}
-                        price={service.price}
-                        type="SERVICE"
-                        image={service.images?.[0]}
-                        partnerId={partner.id}
-                        partnerName={partner.name}
-                        partnerSlug={partner.slug}
-                      />
+                        {service.durationMinutes && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Duration: {service.durationMinutes} mins
+                          </p>
+                        )}
+
+                        <div className="mt-3">
+                          <AddToCartButton
+                            id={service.id}
+                            name={service.name}
+                            price={service.price}
+                            type="SERVICE"
+                            image={service.images?.[0]}
+                            partnerId={partner.id}
+                            partnerName={partner.name}
+                            partnerSlug={partner.slug}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </Card>
                 ))}
