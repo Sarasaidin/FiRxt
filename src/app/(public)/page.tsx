@@ -6,6 +6,7 @@ import { FeaturedPromotions } from "@/components/promotions/featured-promotions"
 import { PHASE1_PARTNER_TYPES } from "@/lib/phase1";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
 export const revalidate = 60;
 
 export default async function HomePage() {
