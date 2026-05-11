@@ -106,7 +106,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         message:
-          "Verification code generated. Email sending failed locally, so check the terminal for the code.",
+          "Verification code generated. Please enter the 6-digit code before submitting your application.",
       });
     }
 
