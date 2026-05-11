@@ -10,39 +10,48 @@ export const dynamic = "force-dynamic";
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [partners, promotions] = await Promise.all([
-    prisma.partner.findMany({
-      where: {
-        status: "APPROVED",
-        type: { in: PHASE1_PARTNER_TYPES as any },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 6,
-      select: {
-        id: true,
-        slug: true,
-        name: true,
-        type: true,
-        city: true,
-        state: true,
-        addressLine1: true,
-        logoUrl: true,
-        isVerified: true,
-        latitude: true,
-        longitude: true,
-      },
-    }),
+  let partners: any[] = [];
+  let promotions: any[] = [];
+  
+  try {
+    [partners, promotions] = await Promise.all([
+      prisma.partner.findMany({
+        where: {
+          status: "APPROVED",
+          type: { in: PHASE1_PARTNER_TYPES as any },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 6,
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          type: true,
+          city: true,
+          state: true,
+          addressLine1: true,
+          logoUrl: true,
+          isVerified: true,
+          latitude: true,
+          longitude: true,
+        },
+      }),
 
-    prisma.promotion.findMany({
-      where: {
-        status: "ACTIVE",
-        startDate: { lte: new Date() },
-        endDate: { gte: new Date() },
-      },
-      take: 3,
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
+      prisma.promotion.findMany({
+        where: {
+          status: "ACTIVE",
+          startDate: { lte: new Date() },
+          endDate: { gte: new Date() },
+        },
+        take: 3,
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+  }catch (error) {
+    console.error("[homepage data]", error);
+    partners=[];
+    promotions=[];
+  }
 
   return (
     <div className="min-h-screen bg-teal-gradient">
