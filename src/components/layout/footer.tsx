@@ -18,8 +18,7 @@ export function Footer() {
             </div>
 
             <p className="text-sm text-white/60">
-              Malaysia&apos;s trusted healthcare and wellness marketplace
-              connecting you to verified pharmacies and clinics.
+              Malaysia&apos;s trusted healthcare and wellness marketplace connecting you to verified medical professionals.
             </p>
           </div>
 
@@ -54,7 +53,7 @@ export function Footer() {
             <ul className="space-y-2 text-sm text-white/70">
               <li>
                 <Link href="/partner-register" className="hover:text-white">
-                  Register Your Business
+                  Partner Registration
                 </Link>
               </li>
               <li>
@@ -83,7 +82,7 @@ export function Footer() {
         </div>
 
         <div className="mt-8 border-t border-white/20 pt-6 text-center text-xs text-white/50">
-          © {new Date().getFullYear()} FiRxt Sdn Bhd. All rights reserved.
+          © {new Date().getFullYear()} WellAI Sdn Bhd. All rights reserved.
         </div>
       </div>
     </footer>

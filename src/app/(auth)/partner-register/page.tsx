@@ -13,11 +13,16 @@ const STEPS = ["Account", "Business", "Location", "Review"];
 type PartnerRegisterForm = {
   name: string;
   email: string;
+  emailVerificationCode: string;
   password: string;
+  confirmPassword: string;
+  countryCode: string;
   phone: string;
   businessName: string;
+  businessSsmNumber: string;
   type: string;
-  businessEmail: string;
+  otherBusinessType: string;
+  businessCountryCode: string;
   businessPhone: string;
   website: string;
   description: string;
@@ -36,6 +41,10 @@ export default function PartnerRegisterPage() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [verificationCodeSent, setVerificationCodeSent] = useState(false);
+  const [verificationLoading, setVerificationLoading] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState("");
+  const [emailVerified, setEmailVerified] = useState(false);
 
   const {
     register,
@@ -49,11 +58,16 @@ export default function PartnerRegisterPage() {
     defaultValues: {
       name: "",
       email: "",
+      emailVerificationCode: "",
       password: "",
+      confirmPassword: "",
+      countryCode: "+60",
       phone: "",
       businessName: "",
+      businessSsmNumber: "",
       type: "PHARMACY",
-      businessEmail: "",
+      otherBusinessType: "",
+      businessCountryCode: "+60",
       businessPhone: "",
       website: "",
       description: "",
@@ -70,9 +84,32 @@ export default function PartnerRegisterPage() {
   const typeOptions = [
     { value: "PHARMACY", label: "Community Pharmacy" },
     { value: "CLINIC", label: "Medical Clinic" },
+    { value: "OTHERS", label: "Others" },
   ];
 
-  async function goToNextStep(fields: (keyof PartnerRegisterForm)[], nextStep: number) {
+  const stateOptions = [
+    { value: "Johor", label: "Johor" },
+    { value: "Kedah", label: "Kedah" },
+    { value: "Kelantan", label: "Kelantan" },
+    { value: "Melaka", label: "Melaka" },
+    { value: "Negeri Sembilan", label: "Negeri Sembilan" },
+    { value: "Pahang", label: "Pahang" },
+    { value: "Penang", label: "Penang" },
+    { value: "Perak", label: "Perak" },
+    { value: "Perlis", label: "Perlis" },
+    { value: "Sabah", label: "Sabah" },
+    { value: "Sarawak", label: "Sarawak" },
+    { value: "Selangor", label: "Selangor" },
+    { value: "Terengganu", label: "Terengganu" },
+    { value: "Kuala Lumpur", label: "Kuala Lumpur" },
+    { value: "Labuan", label: "Labuan" },
+    { value: "Putrajaya", label: "Putrajaya" },
+  ];
+
+  async function goToNextStep(
+    fields: (keyof PartnerRegisterForm)[],
+    nextStep: number
+  ) {
     const isValid = await trigger(fields, {
       shouldFocus: true,
     });
@@ -91,6 +128,95 @@ export default function PartnerRegisterPage() {
     });
   }
 
+  async function sendVerificationCode() {
+    setError("");
+    setVerificationMessage("");
+
+    const emailValid = await trigger("email", {
+      shouldFocus: true,
+    });
+
+    if (!emailValid) return;
+
+    setVerificationLoading(true);
+
+    try {
+      const response = await fetch("/api/partners/verify-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: watch("email"),
+          action: "send",
+        }),
+      });
+
+      const json = await response.json();
+
+      if (!response.ok) {
+        setError(json.error ?? "Failed to send verification code.");
+        return;
+      }
+
+      setVerificationCodeSent(true);
+      setEmailVerified(false);
+      setVerificationMessage(
+        json.message ?? "Verification code sent to your email."
+      );
+    } catch {
+      setError("Something went wrong while sending the verification code.");
+    } finally {
+      setVerificationLoading(false);
+    }
+  }
+
+  async function verifyEmailCode() {
+    setError("");
+    setVerificationMessage("");
+
+    const codeValid = await trigger("emailVerificationCode", {
+      shouldFocus: true,
+    });
+
+    if (!codeValid) return;
+
+    setVerificationLoading(true);
+
+    try {
+      const response = await fetch("/api/partners/verify-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      
+        body: JSON.stringify({
+          email: watch("email"),
+          code: watch("emailVerificationCode"),
+          action: "verify",
+        }),
+      });
+
+      const json = await response.json();
+
+      if (!response.ok) {
+        setEmailVerified(false);
+        setError(json.error ?? "Invalid verification code.");
+        return;
+      }
+
+      setEmailVerified(true);
+      setVerificationMessage(
+        json.message ?? "Email verified successfully."
+      );
+    } catch {
+      setEmailVerified(false);
+      setError("Something went wrong while verifying the code.");
+    } finally {
+      setVerificationLoading(false);
+    }
+  }
+
   async function onSubmit(data: PartnerRegisterForm) {
     setLoading(true);
     setError("");
@@ -101,7 +227,11 @@ export default function PartnerRegisterPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          phone: `${data.countryCode}${data.phone}`,
+          businessPhone: `${data.businessCountryCode}${data.businessPhone}`,
+        }),
       });
 
       const json = await response.json();
@@ -151,7 +281,8 @@ export default function PartnerRegisterPage() {
       </div>
 
       <p className="mb-6 text-sm text-gray-600">
-        Phase 1 partner onboarding is currently open for clinics and pharmacies only.
+        Phase 1 partner onboarding is currently open for clinics and pharmacies
+        only.
       </p>
 
       {error && (
@@ -195,41 +326,101 @@ export default function PartnerRegisterPage() {
               required
             />
 
-            <Input
-              {...register("phone", {
-                required: "Phone number is required",
-                minLength: {
-                  value: 8,
-                  message: "Enter a valid phone number",
-                },
-              })}
-              id="phone"
-              label="Phone Number"
-              placeholder="+60123456789"
-              error={errors.phone?.message}
-              required
-            />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[140px_1fr]">
+              <Input
+                {...register("countryCode", {
+                  required: "Country code is required",
+                  pattern: {
+                    value: /^\+\d{1,4}$/,
+                    message: "Use format like +60",
+                  },
+                })}
+                id="countryCode"
+                label="Country Code"
+                placeholder="+60"
+                error={errors.countryCode?.message}
+                required
+              />
+
+              <Input
+                {...register("phone", {
+                  required: "Phone number is required",
+                  pattern: {
+                    value: /^\d{7,12}$/,
+                    message: "Enter phone number without country code",
+                  },
+                })}
+                id="phone"
+                label="Phone Number"
+                placeholder="123456789"
+                error={errors.phone?.message}
+                required
+              />
+            </div>
 
             <Input
               {...register("password", {
                 required: "Password is required",
-                minLength: {
-                  value: 8,
-                  message: "Password must be at least 8 characters",
+                validate: (value) => {
+                  if (value.length < 12) {
+                    return "Password must be at least 12 characters";
+                  }
+
+                  if (!/[A-Z]/.test(value)) {
+                    return "Password must include at least one uppercase letter";
+                  }
+
+                  if (!/[a-z]/.test(value)) {
+                    return "Password must include at least one lowercase letter";
+                  }
+
+                  if (!/\d/.test(value)) {
+                    return "Password must include at least one number";
+                  }
+
+                  if (!/[^A-Za-z0-9]/.test(value)) {
+                    return "Password must include at least one special character";
+                  }
+
+                  return true;
                 },
               })}
               id="password"
               label="Password"
               type="password"
-              placeholder="Minimum 8 characters"
+              placeholder="Minimum 12 characters"
               error={errors.password?.message}
+              required
+            />
+
+            <Input
+              {...register("confirmPassword", {
+                required: "Please confirm your password",
+                validate: (value) =>
+                  value === watch("password") || "Passwords do not match",
+              })}
+              id="confirmPassword"
+              label="Confirm Password"
+              type="password"
+              placeholder="Re-enter your password"
+              error={errors.confirmPassword?.message}
               required
             />
 
             <Button
               type="button"
               onClick={() =>
-                goToNextStep(["name", "email", "phone", "password"], 1)
+                goToNextStep(
+                  [
+                    "name",
+                    "email",
+                    "countryCode",
+                    "phone",
+                    "password",
+                    "confirmPassword",
+                  ],
+                  1
+                )
               }
               className="mt-2"
             >
@@ -256,6 +447,21 @@ export default function PartnerRegisterPage() {
               required
             />
 
+            <Input
+              {...register("businessSsmNumber", {
+                required: "Business SSM number is required",
+                pattern: {
+                  value: /^\d{12}$/,
+                  message: "Enter a valid 12-digit SSM number",
+                },
+              })}
+              id="businessSsmNumber"
+              label="Business SSM Number"
+              placeholder="202601234567"
+              error={errors.businessSsmNumber?.message}
+              required
+            />
+
             <Select
               {...register("type", {
                 required: "Business type is required",
@@ -267,37 +473,50 @@ export default function PartnerRegisterPage() {
               required
             />
 
+            {watch("type") === "OTHERS" && (
+              <Input
+                {...register("otherBusinessType", {
+                  required: "Please specify your business type",
+                })}
+                id="otherBusinessType"
+                label="Please specify"
+                placeholder="Enter your business type"
+                error={errors.otherBusinessType?.message}
+                required
+              />
+            )}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-[140px_1fr]">
+
             <Input
-              {...register("businessEmail", {
-                required: "Business email is required",
+              {...register("businessCountryCode", {
+                required: "Business country code is required",
                 pattern: {
-                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                  message: "Enter a valid business email address",
+                  value: /^\+\d{1,4}$/,
+                  message: "Use format like +60",
                 },
               })}
-              id="businessEmail"
-              label="Business Email"
-              type="email"
-              placeholder="business@example.com"
-              error={errors.businessEmail?.message}
+              id="businessCountryCode"
+              label="Country Code"
+              placeholder="+60"
+              error={errors.businessCountryCode?.message}
               required
             />
-
+            
             <Input
               {...register("businessPhone", {
                 required: "Business phone is required",
-                minLength: {
-                  value: 8,
-                  message: "Enter a valid business phone number",
+                pattern: {
+                  value: /^\d{7,12}$/,
+                  message: "Enter business phone number without country code",
                 },
               })}
               id="businessPhone"
-              label="Business Phone"
-              placeholder="+60312345678"
+              label="Business Phone Number"
+              placeholder="312345678"
               error={errors.businessPhone?.message}
               required
             />
-
+          </div>
             <Input
               {...register("website")}
               id="website"
@@ -336,7 +555,7 @@ export default function PartnerRegisterPage() {
                 type="button"
                 onClick={() =>
                   goToNextStep(
-                    ["businessName", "type", "businessEmail", "businessPhone"],
+                    ["businessName", "businessSsmNumber", "type", "businessCountryCode", "businessPhone"],
                     2
                   )
                 }
@@ -350,9 +569,7 @@ export default function PartnerRegisterPage() {
         {/* Step 2: Location */}
         {step === 2 && (
           <div className="flex flex-col gap-4">
-            <h2 className="text-xl font-bold text-brand-navy">
-              Location
-            </h2>
+            <h2 className="text-xl font-bold text-brand-navy">Location</h2>
 
             <Input
               {...register("addressLine1", {
@@ -385,13 +602,13 @@ export default function PartnerRegisterPage() {
                 required
               />
 
-              <Input
+              <Select
                 {...register("state", {
                   required: "State is required",
                 })}
                 id="state"
                 label="State"
-                placeholder="Federal Territory of KL"
+                options={stateOptions}
                 error={errors.state?.message}
                 required
               />
@@ -416,6 +633,10 @@ export default function PartnerRegisterPage() {
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 GPS Coordinates
               </label>
+
+              <p className="mb-3 text-xs text-gray-500">
+                Click the Locate Me button to automatically fill in your current GPS coordinates.
+              </p>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
                 <Input
@@ -492,16 +713,18 @@ export default function PartnerRegisterPage() {
               </p>
 
               <p>
+                <strong>Phone:</strong> {watch("countryCode")}
+                {watch("phone")}
+              </p>
+
+              <p>
                 <strong>Business:</strong> {watch("businessName")} (
                 {watch("type")})
               </p>
 
               <p>
-                <strong>Business Email:</strong> {watch("businessEmail")}
-              </p>
-
-              <p>
-                <strong>Business Phone:</strong> {watch("businessPhone")}
+                <strong>Business Phone:</strong> {watch("businessCountryCode")}
+                {watch("businessPhone")}
               </p>
 
               <p>
@@ -515,6 +738,67 @@ export default function PartnerRegisterPage() {
               admin team. You&apos;ll receive an email once approved.
             </div>
 
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <h3 className="mb-2 text-sm font-semibold text-brand-navy">
+                Email Verification
+              </h3>
+
+              <p className="mb-3 text-sm text-gray-600">
+                Before submitting your application, please verify your email address using a
+                6-digit code.
+              </p>
+
+              <div className="mb-3 flex flex-col gap-3 sm:flex-row">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={sendVerificationCode}
+                  loading={verificationLoading}
+                  disabled={emailVerified}
+                >
+                  {verificationCodeSent ? "Resend Code" : "Send Verification Code"}
+                </Button>
+
+                {emailVerified && (
+                  <span className="flex items-center text-sm font-medium text-green-700">
+                    Email verified
+                  </span>
+                )}
+              </div>
+
+              {verificationCodeSent && !emailVerified && (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <Input
+                    {...register("emailVerificationCode", {
+                      required: "Verification code is required",
+                      pattern: {
+                        value: /^\d{6}$/,
+                        message: "Verification code must be 6 digits",
+                      },
+                    })}
+                    id="emailVerificationCode"
+                    label="6-digit verification code"
+                    placeholder="123456"
+                    error={errors.emailVerificationCode?.message}
+                  />
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={verifyEmailCode}
+                    loading={verificationLoading}
+                    className="shrink-0"
+                  >
+                    Verify Code
+                  </Button>
+                </div>
+              )}
+
+              {verificationMessage && (
+                <p className="mt-3 text-sm text-brand-navy">{verificationMessage}</p>
+              )}
+            </div>
+
             <div className="flex gap-3">
               <Button
                 type="button"
@@ -524,7 +808,7 @@ export default function PartnerRegisterPage() {
                 Back
               </Button>
 
-              <Button type="submit" loading={loading}>
+              <Button type="submit" loading={loading} disabled={!emailVerified}>
                 Submit Application
               </Button>
             </div>

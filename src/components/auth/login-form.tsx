@@ -97,7 +97,7 @@ export function LoginForm() {
       <div className="mt-2 text-center text-sm text-gray-600">
         Are you a partner?{" "}
         <Link href="/partner-register" className="text-brand-navy font-medium hover:underline">
-          Register your business
+          Partner Registration
         </Link>
       </div>
     </Card>

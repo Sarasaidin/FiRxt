@@ -91,7 +91,7 @@ export default async function HomePage() {
               href="/partner-register"
               className="mt-4 inline-flex rounded-lg bg-brand-green px-4 py-2 text-sm font-medium text-white hover:bg-brand-green/90"
             >
-              Register your business
+              Partner Registration
             </Link>
           </div>
         ) : (
