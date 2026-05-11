@@ -57,6 +57,15 @@ export default async function HomePage() {
     <div className="min-h-screen bg-teal-gradient">
       <HeroSearch />
 
+      <div className="mx-auto flex max-w-7xl justify-center px-4 pb-8">
+        <Link
+          href="/register"
+          className="rounded-lg bg-brand-green px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-green/90"
+        >
+          Sign Up
+        </Link> 
+      </div>
+
       {promotions.length > 0 && (
         <FeaturedPromotions promotions={promotions} />
       )}

@@ -248,7 +248,7 @@ export function Navbar() {
             className="hidden items-center gap-1 text-sm transition-colors hover:text-brand-teal sm:flex"
           >
             <LogIn className="h-4 w-4" />
-            Login
+            Sign In
           </Link>
         )}
 
@@ -325,7 +325,7 @@ export function Navbar() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="hover:text-brand-teal"
               >
-                Login
+                Sign In
               </Link>
             )}
           </nav>
