@@ -30,8 +30,13 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    const passwordPattern =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$/;
+
+    if (!passwordPattern.test(password)) {
+      setError(
+        "Password must be at least 12 characters and include an uppercase letter, lowercase letter, number, and special character."
+      );
       return;
     }
 
@@ -43,7 +48,7 @@ export default function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/password/reset", {
+      const response = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

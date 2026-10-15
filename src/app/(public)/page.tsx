@@ -4,12 +4,15 @@ import { HeroSearch } from "@/components/home/home-hero";
 import { HomeCategories } from "@/components/home/home-categories";
 import { FeaturedPromotions } from "@/components/promotions/featured-promotions";
 import { PHASE1_PARTNER_TYPES } from "@/lib/phase1";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 60;
 
 export default async function HomePage() {
+  const session = await getServerSession(authOptions);
   let partners: any[] = [];
   let promotions: any[] = [];
   
@@ -57,14 +60,16 @@ export default async function HomePage() {
     <div className="min-h-screen bg-teal-gradient">
       <HeroSearch />
 
-      <div className="mx-auto flex max-w-7xl justify-center px-4 pb-8">
-        <Link
-          href="/register"
-          className="rounded-lg bg-brand-green px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-green/90"
-        >
-          Sign Up
-        </Link> 
-      </div>
+      {!session?.user && (
+        <div className="mx-auto flex max-w-7xl justify-center px-4 pb-8">
+          <Link
+            href="/register"
+            className="rounded-lg bg-brand-green px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-green/90"
+          >
+            Sign Up
+          </Link>
+        </div>
+      )}
 
       {promotions.length > 0 && (
         <FeaturedPromotions promotions={promotions} />
