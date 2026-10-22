@@ -66,6 +66,24 @@ enum PromotionStatus {
   CANCELLED
 }
 
+enum ClinicVisitStatus {
+  REGISTERED
+  CHECKED_IN
+  SAMPLE_COLLECTED
+  SAMPLE_SENT_TO_LAB
+  LAB_REPORT_RECEIVED
+  AI_REPORT_READY
+  CONSULTATION_COMPLETED
+  CANCELLED
+}
+
+enum PaymentRecoveryStatus {
+  PENDING
+  REFUNDING
+  REFUNDED
+  MANUAL_REVIEW
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -182,14 +200,14 @@ model Partner {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  user       User              @relation(fields: [userId], references: [id])
-  products   Product[]
-  services   Service[]
-  orders     Order[]
-  reviews    Review[]
-  promotions Promotion[]
+  user           User               @relation(fields: [userId], references: [id])
+  products       Product[]
+  services       Service[]
+  orders         Order[]
+  reviews        Review[]
+  promotions     Promotion[]
   promotionLinks PromotionPartner[]
-  analytics  PartnerAnalytic[]
+  analytics      PartnerAnalytic[]
 
   @@map("partners")
 }
@@ -264,18 +282,18 @@ model Service {
 }
 
 model Order {
-  id            String        @id @default(cuid())
-  orderNumber   String        @unique
-  userId        String
-  partnerId     String
-  addressId     String?
-  status OrderStatus @default(PENDING_PAYMENT)
-  paymentStatus PaymentStatus @default(PENDING)
-  subtotal      Int
-  discountAmount Int          @default(0)
-  deliveryFee   Int           @default(0)
-  tax           Int           @default(0)
-  total         Int
+  id             String        @id @default(cuid())
+  orderNumber    String        @unique
+  userId         String
+  partnerId      String
+  addressId      String?
+  status         OrderStatus   @default(PENDING_PAYMENT)
+  paymentStatus  PaymentStatus @default(PENDING)
+  subtotal       Int
+  discountAmount Int           @default(0)
+  deliveryFee    Int           @default(0)
+  tax            Int           @default(0)
+  total          Int
 
   stripePaymentIntentId String? @unique
   stripeSessionId       String? @unique
@@ -285,16 +303,17 @@ model Order {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  user      User                 @relation(fields: [userId], references: [id])
-  partner   Partner              @relation(fields: [partnerId], references: [id])
-  address   Address?             @relation(fields: [addressId], references: [id])
-  promotion Promotion?           @relation(fields: [promotionId], references: [id])
-  items     OrderItem[]
-  history   OrderStatusHistory[]
+  user        User                 @relation(fields: [userId], references: [id])
+  partner     Partner              @relation(fields: [partnerId], references: [id])
+  address     Address?             @relation(fields: [addressId], references: [id])
+  promotion   Promotion?           @relation(fields: [promotionId], references: [id])
+  items       OrderItem[]
+  history     OrderStatusHistory[]
+  clinicVisit ClinicVisit?
 
   fulfillmentType FulfillmentType?
-  pickupAt DateTime?
-  visitAt DateTime?
+  pickupAt        DateTime?
+  visitAt         DateTime?
 
   @@map("orders")
 }
@@ -329,6 +348,26 @@ model OrderStatusHistory {
   @@map("order_status_history")
 }
 
+model ClinicVisit {
+  id                      String            @id @default(cuid())
+  visitNumber             String            @unique
+  orderId                 String            @unique
+  status                  ClinicVisitStatus @default(REGISTERED)
+  checkedInAt             DateTime?
+  sampleCollectedAt       DateTime?
+  sampleSentToLabAt       DateTime?
+  labReportReceivedAt     DateTime?
+  aiReportReadyAt         DateTime?
+  consultationCompletedAt DateTime?
+  notes                   String?           @db.Text
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("clinic_visits")
+}
+
 model Promotion {
   id            String          @id @default(cuid())
   partnerId     String?
@@ -348,10 +387,10 @@ model Promotion {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
-  partner Partner?        @relation(fields: [partnerId], references: [id])
-  items   PromotionItem[]
+  partner               Partner?           @relation(fields: [partnerId], references: [id])
+  items                 PromotionItem[]
   participatingPartners PromotionPartner[]
-  orders  Order[]
+  orders                Order[]
 
   @@map("promotions")
 }
@@ -441,15 +480,33 @@ model SiteConfig {
   @@map("site_config")
 }
 
-
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+model PaymentRecovery {
+  id                    String                @id @default(cuid())
+  stripeSessionId       String                @unique
+  stripePaymentIntentId String?
+  stripeRefundId        String?               @unique
+  amount                Int
+  currency              String                @default("myr")
+  reason                String
+  status                PaymentRecoveryStatus @default(PENDING)
+  attempts              Int                   @default(0)
+  lastError             String?               @db.Text
+  claimToken            String?
+  claimExpiresAt        DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  @@map("payment_recoveries")
 }
