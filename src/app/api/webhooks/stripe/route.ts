@@ -1,18 +1,41 @@
+
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
+import { Prisma } from "@prisma/client";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
-import { generateOrderNumber } from "@/lib/utils";
+import {
+  generateOrderNumber,
+  generateVisitNumber,
+} from "@/lib/utils";
+import { getRefundDecision } from "@/lib/payment-refund";
+import { recoverPaidCheckout } from "@/lib/payment-recovery";
+
+
+type VerifiedItem = {
+  id: string;
+  type: "PHYSICAL" | "SERVICE";
+  quantity: number;
+  unitPrice: number;
+};
+
+class RecoverableFulfillmentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RecoverableFulfillmentError";
+  }
+}
 
 export async function POST(req: Request) {
   const body = await req.text();
   const headersList = await headers();
   const signature = headersList.get("stripe-signature");
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  if (!signature) {
+  if (!signature || !webhookSecret) {
     return NextResponse.json(
-      { error: "Missing stripe-signature header" },
+      { error: "Webhook signature configuration is missing" },
       { status: 400 }
     );
   }
@@ -23,13 +46,13 @@ export async function POST(req: Request) {
     event = stripe.webhooks.constructEvent(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      webhookSecret
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Stripe Webhook] Signature verification failed:", error);
 
     return NextResponse.json(
-      { error: `Webhook Error: ${error.message}` },
+      { error: "Invalid webhook signature" },
       { status: 400 }
     );
   }
@@ -37,8 +60,8 @@ export async function POST(req: Request) {
   try {
     switch (event.type) {
       case "checkout.session.completed": {
-        const checkoutSession = event.data.object as Stripe.Checkout.Session;
-        await handleCheckoutCompleted(checkoutSession);
+        const session = event.data.object as Stripe.Checkout.Session;
+        await handleCheckoutCompleted(session);
         break;
       }
 
@@ -48,28 +71,46 @@ export async function POST(req: Request) {
         await prisma.order.updateMany({
           where: {
             stripePaymentIntentId: paymentIntent.id,
+            paymentStatus: { not: "PAID" },
           },
-          data: {
-            paymentStatus: "FAILED",
-          },
+          data: { paymentStatus: "FAILED" },
         });
-
         break;
       }
 
       case "charge.refunded": {
         const charge = event.data.object as Stripe.Charge;
 
-        if (charge.payment_intent) {
-          await prisma.order.updateMany({
-            where: {
-              stripePaymentIntentId: charge.payment_intent as string,
-            },
-            data: {
-              paymentStatus: "REFUNDED",
-              status: "REFUNDED",
-            },
-          });
+        if (
+          typeof charge.payment_intent === "string" &&
+          charge.amount > 0 &&
+          charge.amount_refunded >= 0 &&
+          charge.amount_refunded <= charge.amount
+        ) {
+          const decision = getRefundDecision(
+            charge.amount,
+            charge.amount_refunded
+          );
+
+          if (decision === "FULL_REFUND") {
+            await prisma.order.updateMany({
+              where: {
+                stripePaymentIntentId: charge.payment_intent,
+              },
+              data: {
+                paymentStatus: "REFUNDED",
+                status: "REFUNDED",
+              },
+            });
+          } else {
+            console.info(
+              `[Stripe Webhook] Partial refund for charge ${charge.id}; order remains unchanged.`
+            );
+          }
+        } else {
+          throw new Error(
+            `Invalid refund amounts for Stripe charge ${charge.id}`
+          );
         }
 
         break;
@@ -80,130 +121,365 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ received: true });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Stripe Webhook] Handler failed:", error);
 
     return NextResponse.json(
-      { error: error?.message || "Webhook handler failed" },
+      { error: "Webhook handler failed" },
       { status: 500 }
     );
   }
 }
 
-async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+async function handleCheckoutCompleted(
+  session: Stripe.Checkout.Session
+) {
+  if (session.mode !== "payment" || session.payment_status !== "paid") {
+    console.log(
+      `[Stripe Webhook] Session ${session.id} is not a paid payment session.`
+    );
+    return;
+  }
+
+  if (
+    session.currency !== "myr" ||
+    session.amount_total === null ||
+    session.amount_subtotal === null
+  ) {
+    throw new Error("Invalid checkout currency or amount");
+  }
+
+  const metadata = session.metadata;
+  const userId = metadata?.userId;
+  const partnerId = metadata?.partnerId;
+  const requestedFulfillment = metadata?.fulfillmentType;
+  const promotionId = metadata?.promotionId || null;
+
+  if (!userId || !partnerId) {
+    throw new Error("Missing checkout user or partner metadata");
+  }
+
   const existingOrder = await prisma.order.findUnique({
-    where: {
-      stripeSessionId: session.id,
-    },
+    where: { stripeSessionId: session.id },
+    select: { id: true },
   });
 
   if (existingOrder) {
-    return existingOrder;
+    await ensureClinicVisit(existingOrder.id);
+    return;
   }
 
-  const metadata = session.metadata ?? {};
+  // Retrieve the actual line items from Stripe, not the browser cart.
+  const stripeLineItems = await stripe.checkout.sessions.listLineItems(
+    session.id,
+    { limit: 100, expand: ["data.price.product"] }
+  );
 
-  const userId = metadata.userId;
-  const partnerId = metadata.partnerId;
-  const addressId = metadata.addressId || null;
-  const promotionId = metadata.promotionId || null;
-  const requestedFulfillmentType = metadata.fulfillmentType;
-  const rawItems = metadata.items || "[]";
-
-  if (!userId || !partnerId) {
-    throw new Error("Missing required checkout metadata: userId or partnerId");
+  if (stripeLineItems.has_more || stripeLineItems.data.length === 0) {
+    throw new Error("Checkout line items are empty or exceed the supported limit");
   }
 
-  let items: any[] = [];
+  const verifiedItems: VerifiedItem[] = [];
 
-  try {
-    items = JSON.parse(rawItems);
-  } catch {
-    throw new Error("Invalid checkout items metadata");
+  for (const line of stripeLineItems.data) {
+    const stripeProduct = line.price?.product;
+
+    if (
+      !stripeProduct ||
+      typeof stripeProduct === "string" ||
+      !line.price ||
+      line.price.unit_amount === null ||
+      line.quantity === null ||
+      !Number.isSafeInteger(line.quantity) ||
+      line.quantity < 1 ||
+      line.currency !== "myr"
+    ) {
+      throw new Error("Invalid Stripe checkout line item");
+    }
+
+    // Stripe can return a DeletedProduct, which has no metadata.
+    if ("deleted" in stripeProduct && stripeProduct.deleted) {
+      throw new Error("Stripe checkout references a deleted product");
+    }
+
+    const itemType = stripeProduct.metadata.type;
+    const itemId =
+      itemType === "PHYSICAL"
+        ? stripeProduct.metadata.productId
+        : itemType === "SERVICE"
+        ? stripeProduct.metadata.serviceId
+        : undefined;
+
+    if (
+      !itemId ||
+      (itemType !== "PHYSICAL" && itemType !== "SERVICE")
+    ) {
+      throw new Error("Missing or invalid Stripe product metadata");
+    }
+
+    if (
+      !Number.isSafeInteger(line.price.unit_amount) ||
+      line.price.unit_amount < 0 ||
+      line.amount_subtotal !== line.price.unit_amount * line.quantity
+    ) {
+      throw new Error("Stripe line item amount is inconsistent");
+    }
+
+    verifiedItems.push({
+      id: itemId,
+      type: itemType,
+      quantity: line.quantity,
+      unitPrice: line.price.unit_amount,
+    });
   }
 
-  if (!Array.isArray(items) || items.length === 0) {
-    throw new Error("Missing checkout items metadata");
+  // Stripe's pre-discount line-item subtotal must match the session.
+  const calculatedSubtotal = verifiedItems.reduce(
+    (sum, item) => sum + item.unitPrice * item.quantity,
+    0
+  );
+
+  if (calculatedSubtotal !== session.amount_subtotal) {
+    throw new Error("Checkout subtotal does not match Stripe line items");
   }
 
-  const subtotal = session.amount_subtotal ?? 0;
-  const total = session.amount_total ?? 0;
-  const discountAmount = Math.max(subtotal - total, 0);
+  if (session.amount_total > session.amount_subtotal) {
+    throw new Error("Unexpected checkout total");
+  }
 
-  const hasServiceItem = items.some((item) => item.type === "SERVICE");
+  const hasServiceItem = verifiedItems.some(
+    (item) => item.type === "SERVICE"
+  );
 
-  const finalFulfillmentType = hasServiceItem
+  const fulfillmentType = hasServiceItem
     ? "IN_STORE_VISIT"
-    : requestedFulfillmentType === "HOME_DELIVERY"
+    : requestedFulfillment === "HOME_DELIVERY"
     ? "HOME_DELIVERY"
     : "IN_STORE_PICKUP";
 
   const orderStatus =
-    finalFulfillmentType === "IN_STORE_VISIT"
+    fulfillmentType === "IN_STORE_VISIT"
       ? "BOOKING_CONFIRMED"
       : "READY_FOR_COLLECTION";
 
-  const order = await prisma.order.create({
-    data: {
-      orderNumber: generateOrderNumber(),
-      userId,
-      partnerId,
-      addressId,
-      promotionId,
-      status: orderStatus,
-      paymentStatus: "PAID",
-      fulfillmentType: finalFulfillmentType,
-      subtotal,
-      discountAmount,
-      deliveryFee: 0,
-      tax: 0,
-      total,
-      stripeSessionId: session.id,
-      stripePaymentIntentId:
-        typeof session.payment_intent === "string"
-          ? session.payment_intent
-          : null,
+  const discountAmount =
+    session.amount_subtotal - session.amount_total;
 
-      items: {
-        create: items.map((item: any) => ({
-          productId: item.type === "PHYSICAL" ? item.id : null,
-          serviceId: item.type === "SERVICE" ? item.id : null,
-          quantity: item.quantity,
-          unitPrice: item.price,
-          totalPrice: item.price * item.quantity,
-          itemType: item.type,
-        })),
-      },
-    },
-  });
+  try {
+    await prisma.$transaction(
+      async (tx) => {
+        // Recheck inside the transaction to reduce duplicate processing.
+        const duplicate = await tx.order.findUnique({
+          where: { stripeSessionId: session.id },
+          select: { id: true },
+        });
 
-  for (const item of items) {
-    if (item.type === "PHYSICAL") {
-      await prisma.product.update({
-        where: {
-          id: item.id,
-        },
-        data: {
-          stock: {
-            decrement: item.quantity,
+        if (duplicate) {
+          return;
+        }
+
+        const partner = await tx.partner.findUnique({
+          where: { id: partnerId },
+          select: { id: true, type: true },
+        });
+
+        if (!partner) {
+          throw new RecoverableFulfillmentError(
+            `Checkout partner is unavailable: ${partnerId}`
+          );
+        }
+
+        const orderItems: Prisma.OrderItemCreateWithoutOrderInput[] = [];
+
+        for (const item of verifiedItems) {
+          if (item.type === "PHYSICAL") {
+            const product = await tx.product.findUnique({
+              where: { id: item.id },
+              select: {
+                id: true,
+                partnerId: true,
+                isActive: true,
+              },
+            });
+
+            if (
+              !product ||
+              !product.isActive ||
+              product.partnerId !== partnerId
+            ) {
+              throw new RecoverableFulfillmentError(
+                `Purchased product is unavailable or invalid: ${item.id}`
+              );
+            }
+
+            orderItems.push({
+              product: { connect: { id: product.id } },
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.unitPrice * item.quantity,
+              itemType: "PHYSICAL",
+            });
+          } else {
+            const service = await tx.service.findUnique({
+              where: { id: item.id },
+              select: {
+                id: true,
+                partnerId: true,
+                isActive: true,
+              },
+            });
+
+            if (
+              !service ||
+              !service.isActive ||
+              service.partnerId !== partnerId
+            ) {
+              throw new RecoverableFulfillmentError(
+                `Purchased service is unavailable or invalid: ${item.id}`
+              );
+            }
+
+            orderItems.push({
+              service: { connect: { id: service.id } },
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.unitPrice * item.quantity,
+              itemType: "SERVICE",
+            });
+          }
+        }
+
+        // Use the promotion only if it still exists. The paid Stripe
+        // session remains the authority for the amount actually charged.
+        const promotion = promotionId
+          ? await tx.promotion.findUnique({
+              where: { id: promotionId },
+              select: { id: true },
+            })
+          : null;
+
+        const order = await tx.order.create({
+          data: {
+            orderNumber: generateOrderNumber(),
+            userId,
+            partnerId,
+            addressId: metadata.addressId || null,
+            promotionId: promotion?.id ?? null,
+            status: orderStatus,
+            paymentStatus: "PAID",
+            fulfillmentType,
+            subtotal: session.amount_subtotal!,
+            discountAmount,
+            deliveryFee: 0,
+            tax: 0,
+            total: session.amount_total!,
+            stripeSessionId: session.id,
+            stripePaymentIntentId:
+              typeof session.payment_intent === "string"
+                ? session.payment_intent
+                : null,
+            items: { create: orderItems },
           },
-        },
-      });
-    }
-  }
+        });
 
-  if (promotionId) {
-    await prisma.promotion.update({
-      where: {
-        id: promotionId,
+        // Conditional decrement prevents stock from going negative.
+        for (const item of verifiedItems) {
+          if (item.type !== "PHYSICAL") continue;
+
+          const result = await tx.product.updateMany({
+            where: {
+              id: item.id,
+              partnerId,
+              isActive: true,
+              stock: { gte: item.quantity },
+            },
+            data: {
+              stock: { decrement: item.quantity },
+            },
+          });
+
+          if (result.count !== 1) {
+            throw new RecoverableFulfillmentError(
+              `Insufficient stock or product unavailable: ${item.id}`
+            );
+          }
+        }
+
+        if (promotion) {
+          await tx.promotion.update({
+            where: { id: promotion.id },
+            data: { usageCount: { increment: 1 } },
+          });
+        }
+
+        if (
+          partner.type === "CLINIC" &&
+          fulfillmentType === "IN_STORE_VISIT" &&
+          hasServiceItem
+        ) {
+          await tx.clinicVisit.upsert({
+            where: { orderId: order.id },
+            update: {},
+            create: {
+              visitNumber: generateVisitNumber(),
+              orderId: order.id,
+              status: "REGISTERED",
+            },
+          });
+        }
       },
-      data: {
-        usageCount: {
-          increment: 1,
-        },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
+  } catch (error) {
+    // A concurrent Stripe retry may win the unique stripeSessionId race.
+    // Confirm that an order now exists before treating the event as handled.
+    const orderAfterError = await prisma.order.findUnique({
+      where: { stripeSessionId: session.id },
+      select: { id: true },
+    });
+
+    if (orderAfterError) {
+      await ensureClinicVisit(orderAfterError.id);
+      return;
+    }
+
+    if (error instanceof RecoverableFulfillmentError) {
+      await recoverPaidCheckout(session, error.message);
+      return;
+    }
+
+    throw error;
+  }
+}
+
+async function ensureClinicVisit(orderId: string) {
+  await prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: {
+        partner: { select: { type: true } },
+        items: { select: { itemType: true } },
       },
     });
-  }
 
-  return order;
+    if (
+      !order ||
+      order.paymentStatus !== "PAID" ||
+      order.partner.type !== "CLINIC" ||
+      order.fulfillmentType !== "IN_STORE_VISIT" ||
+      !order.items.some((item) => item.itemType === "SERVICE")
+    ) {
+      return;
+    }
+
+    await tx.clinicVisit.upsert({
+      where: { orderId: order.id },
+      update: {},
+      create: {
+        visitNumber: generateVisitNumber(),
+        orderId: order.id,
+        status: "REGISTERED",
+      },
+    });
+  });
 }
