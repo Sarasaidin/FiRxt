@@ -34,6 +34,7 @@ export default function RegisterPage() {
     handleSubmit,
     watch,
     trigger,
+    setValue,
     formState: { errors },
   } = useForm<RegisterForm>({
     mode: "onTouched",
@@ -204,6 +205,13 @@ export default function RegisterPage() {
             pattern: {
               value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
               message: "Enter a valid email address",
+            },
+            onChange: () => {
+              setEmailVerified(false);
+              setVerificationCodeSent(false);
+              setVerificationMessage("");
+              setError("");
+              setValue("emailVerificationCode", "");
             },
           })}
           id="email"
