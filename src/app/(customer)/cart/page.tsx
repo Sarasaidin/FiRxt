@@ -39,13 +39,17 @@ export default function CartPage() {
   const [error, setError] = useState("");
 
   const total = subtotal();
-  const hasServiceItem = items.some((item) => item.type === "SERVICE");
+  const requiresInPersonFulfillment = items.some(
+    (item) =>
+      item.type === "SERVICE" ||
+      item.type === "BLOOD_TEST_PACKAGE"
+  );
 
   useEffect(() => {
-    if (hasServiceItem && fulfillmentType === "HOME_DELIVERY") {
+    if (requiresInPersonFulfillment && fulfillmentType === "HOME_DELIVERY") {
       setFulfillmentType("IN_STORE_PICKUP");
     }
-  }, [hasServiceItem, fulfillmentType]);
+  }, [requiresInPersonFulfillment, fulfillmentType]);
 
   function handleApplyPromo() {
     const code = promoCode.trim().toUpperCase();
@@ -74,9 +78,9 @@ export default function CartPage() {
   function handleFulfillmentChange(type: FulfillmentType) {
     setError("");
 
-    if (type === "HOME_DELIVERY" && hasServiceItem) {
+    if (type === "HOME_DELIVERY" && requiresInPersonFulfillment) {
       setError(
-        "Home Delivery is only available for products. Services must be reserved and attended in person."
+        "Home Delivery is only available for physical products. Services and blood-test packages require in-person attendance."
       );
       return;
     }
@@ -111,7 +115,7 @@ export default function CartPage() {
       return;
     }
 
-    if (fulfillmentType === "HOME_DELIVERY" && hasServiceItem) {
+    if (fulfillmentType === "HOME_DELIVERY" && requiresInPersonFulfillment) {
       setError(
         "Home Delivery is only available for products. Please choose Reserve & Collect."
       );
@@ -136,6 +140,7 @@ export default function CartPage() {
             quantity: item.quantity,
             price: item.price,
             name: item.name,
+            partnerId: item.partnerId,
           })),
           promoCode: appliedPromoCode || undefined,
         }),
@@ -237,7 +242,9 @@ export default function CartPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                  onClick={() =>
+                    updateQuantity(item.id, item.type, item.quantity - 1)
+                  }
                   className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 transition-colors hover:border-brand-green"
                 >
                   <Minus className="h-3 w-3" />
@@ -249,7 +256,9 @@ export default function CartPage() {
 
                 <button
                   type="button"
-                  onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                  onClick={() =>
+                    updateQuantity(item.id, item.type, item.quantity + 1)
+                  }
                   className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 transition-colors hover:border-brand-green"
                 >
                   <Plus className="h-3 w-3" />
@@ -262,7 +271,7 @@ export default function CartPage() {
 
               <button
                 type="button"
-                onClick={() => removeItem(item.id)}
+                onClick={() => removeItem(item.id, item.type)}
                 className="text-gray-400 transition-colors hover:text-brand-red"
               >
                 <Trash2 className="h-4 w-4" />
@@ -325,13 +334,13 @@ export default function CartPage() {
                   onClick={() =>
                     handleFulfillmentChange("HOME_DELIVERY")
                   }
-                  disabled={hasServiceItem}
+                  disabled={requiresInPersonFulfillment}
                   className={`rounded-xl border p-4 text-left transition-all ${
                     fulfillmentType === "HOME_DELIVERY"
                       ? "border-brand-green bg-green-50"
                       : "border-gray-200 bg-white hover:border-brand-green"
                   } ${
-                    hasServiceItem ? "cursor-not-allowed opacity-50" : ""
+                    requiresInPersonFulfillment ? "cursor-not-allowed opacity-50" : ""
                   }`}
                 >
                   <div className="flex items-start gap-3">
@@ -346,7 +355,7 @@ export default function CartPage() {
                         Deliver eligible products to your address.
                       </p>
 
-                      {hasServiceItem && (
+                      {requiresInPersonFulfillment && (
                         <p className="mt-1 text-xs text-brand-red">
                           Not available for services.
                         </p>

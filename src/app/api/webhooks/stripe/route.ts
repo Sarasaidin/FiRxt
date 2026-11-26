@@ -15,7 +15,7 @@ import { recoverPaidCheckout } from "@/lib/payment-recovery";
 
 type VerifiedItem = {
   id: string;
-  type: "PHYSICAL" | "SERVICE";
+  type: "PHYSICAL" | "SERVICE" | "BLOOD_TEST_PACKAGE";
   quantity: number;
   unitPrice: number;
 };
@@ -203,16 +203,23 @@ async function handleCheckoutCompleted(
     }
 
     const itemType = stripeProduct.metadata.type;
+
     const itemId =
       itemType === "PHYSICAL"
         ? stripeProduct.metadata.productId
         : itemType === "SERVICE"
         ? stripeProduct.metadata.serviceId
+        : itemType === "BLOOD_TEST_PACKAGE"
+        ? stripeProduct.metadata.bloodTestPackageId
         : undefined;
 
     if (
       !itemId ||
-      (itemType !== "PHYSICAL" && itemType !== "SERVICE")
+      (
+        itemType !== "PHYSICAL" &&
+        itemType !== "SERVICE" &&
+        itemType !== "BLOOD_TEST_PACKAGE"
+      )
     ) {
       throw new Error("Missing or invalid Stripe product metadata");
     }
@@ -247,11 +254,13 @@ async function handleCheckoutCompleted(
     throw new Error("Unexpected checkout total");
   }
 
-  const hasServiceItem = verifiedItems.some(
-    (item) => item.type === "SERVICE"
+  const hasClinicVisitItem = verifiedItems.some(
+    (item) =>
+      item.type === "SERVICE" ||
+      item.type === "BLOOD_TEST_PACKAGE"
   );
 
-  const fulfillmentType = hasServiceItem
+  const fulfillmentType = hasClinicVisitItem
     ? "IN_STORE_VISIT"
     : requestedFulfillment === "HOME_DELIVERY"
     ? "HOME_DELIVERY"
@@ -280,8 +289,12 @@ async function handleCheckoutCompleted(
 
         const partner = await tx.partner.findUnique({
           where: { id: partnerId },
-          select: { id: true, type: true },
-        });
+          select: {
+            id: true,
+            type: true,
+            status: true,
+            },
+          });
 
         if (!partner) {
           throw new RecoverableFulfillmentError(
@@ -319,7 +332,7 @@ async function handleCheckoutCompleted(
               totalPrice: item.unitPrice * item.quantity,
               itemType: "PHYSICAL",
             });
-          } else {
+          } else if (item.type === "SERVICE") {
             const service = await tx.service.findUnique({
               where: { id: item.id },
               select: {
@@ -346,8 +359,127 @@ async function handleCheckoutCompleted(
               totalPrice: item.unitPrice * item.quantity,
               itemType: "SERVICE",
             });
+          } else if (item.type === "BLOOD_TEST_PACKAGE") {
+            // The merchant must be an approved clinic.
+            if (
+              partner.type !== "CLINIC" ||
+              partner.status !== "APPROVED"
+            ) {
+              throw new RecoverableFulfillmentError(
+                `Blood-test package merchant is not an approved clinic: ${partnerId}`
+              );
+            }
+
+            const bloodTestPackage = await tx.bloodTestPackage.findUnique({
+              where: { id: item.id },
+              include: {
+                packageTests: {
+                  orderBy: { sortOrder: "asc" },
+                  include: {
+                    labTest: {
+                      select: {
+                        id: true,
+                        code: true,
+                        name: true,
+                        description: true,
+                        category: true,
+                      },
+                    },
+                  },
+                },
+              },
+            });
+
+            if (
+              !bloodTestPackage ||
+              !bloodTestPackage.isActive ||
+              bloodTestPackage.approvalStatus !== "APPROVED"
+            ) {
+              throw new RecoverableFulfillmentError(
+                `Purchased blood-test package is unavailable or invalid: ${item.id}`
+              );
+            }
+
+            // Shared packages require an active, approved owner clinic.
+            if (
+              bloodTestPackage.visibility === "SHARED" &&
+              (
+                !bloodTestPackage.ownerPartnerId ||
+                !(
+                  await tx.partner.findFirst({
+                    where: {
+                      id: bloodTestPackage.ownerPartnerId,
+                      type: "CLINIC",
+                      status: "APPROVED",
+                    },
+                    select: { id: true },
+                  })
+                )
+              )
+            ) {
+              throw new RecoverableFulfillmentError(
+                `Shared blood-test package owner clinic is not approved: ${item.id}`
+              );
+            }
+
+            // Private packages can only be sold by their owner clinic.
+            if (
+              bloodTestPackage.visibility === "PRIVATE" &&
+              bloodTestPackage.ownerPartnerId !== partnerId
+            ) {
+              throw new RecoverableFulfillmentError(
+                `Blood-test package is not available through this clinic: ${item.id}`
+              );
+            }
+
+            // Confirm that the clinic still offers this package.
+            const clinicOffer = await tx.clinicPackage.findUnique({
+              where: {
+                clinicId_packageId: {
+                  clinicId: partnerId,
+                  packageId: bloodTestPackage.id,
+                },
+              },
+              select: {
+                isAvailable: true,
+              },
+            });
+
+            if (!clinicOffer || !clinicOffer.isAvailable) {
+              throw new RecoverableFulfillmentError(
+                `Blood-test package is no longer offered by this clinic: ${item.id}`
+              );
+            }
+
+            // Preserve the package contents at the time of purchase.
+            const includedTestsSnapshot = bloodTestPackage.packageTests.map(
+              (entry) => ({
+                labTestId: entry.labTestId,
+                code: entry.labTest.code,
+                name: entry.labTest.name,
+                description: entry.labTest.description,
+                category: entry.labTest.category,
+                notes: entry.notes,
+                sortOrder: entry.sortOrder,
+              })
+            );
+
+            orderItems.push({
+              bloodTestPackage: {
+                connect: { id: bloodTestPackage.id },
+              },
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.unitPrice * item.quantity,
+              itemType: "BLOOD_TEST_PACKAGE",
+              packageNameSnapshot: bloodTestPackage.name,
+              includedTestsSnapshot,
+              preparationInstructionsSnapshot:
+                bloodTestPackage.preparationInstructions,
+            });
           }
         }
+
 
         // Use the promotion only if it still exists. The paid Stripe
         // session remains the authority for the amount actually charged.
@@ -415,7 +547,7 @@ async function handleCheckoutCompleted(
         if (
           partner.type === "CLINIC" &&
           fulfillmentType === "IN_STORE_VISIT" &&
-          hasServiceItem
+          hasClinicVisitItem
         ) {
           await tx.clinicVisit.upsert({
             where: { orderId: order.id },
@@ -428,7 +560,11 @@ async function handleCheckoutCompleted(
           });
         }
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        maxWait: 10000,
+        timeout: 15000,
+      }
     );
   } catch (error) {
     // A concurrent Stripe retry may win the unique stripeSessionId race.
@@ -467,7 +603,11 @@ async function ensureClinicVisit(orderId: string) {
       order.paymentStatus !== "PAID" ||
       order.partner.type !== "CLINIC" ||
       order.fulfillmentType !== "IN_STORE_VISIT" ||
-      !order.items.some((item) => item.itemType === "SERVICE")
+      !order.items.some(
+        (item) =>
+          item.itemType === "SERVICE" ||
+          item.itemType === "BLOOD_TEST_PACKAGE"
+      )
     ) {
       return;
     }

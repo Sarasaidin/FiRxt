@@ -132,6 +132,14 @@ export function Navbar() {
           Map View
         </Link>
 
+        {/* Blood Tests */}
+        <Link
+          href="/blood-tests"
+          className="hidden text-sm transition-colors hover:text-brand-teal md:flex"
+        >
+          Blood Tests
+        </Link>
+
         {/* Partner with us */}
         <Link
           href="/partner-register"
@@ -211,7 +219,7 @@ export function Navbar() {
                 </Link>
 
                 {session.user?.role === "PARTNER" &&
-                  session.user?.partnerStatus === "APPROVED" && (
+                  (session.user?.partners?.length ?? 0) > 0 && (
                     <Link
                       href="/partner-dashboard"
                       className="block px-4 py-2 text-sm hover:bg-gray-50"
@@ -293,6 +301,14 @@ export function Navbar() {
               className="hover:text-brand-teal"
             >
               Map View
+            </Link>
+
+            <Link
+              href="/blood-tests"
+              onClick={() => setMobileMenuOpen(false)}
+              className="hover:text-brand-teal"
+            >
+              Blood Tests
             </Link>
 
             <Link

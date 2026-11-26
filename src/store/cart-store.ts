@@ -1,7 +1,11 @@
+
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type CartItemType = "PHYSICAL" | "SERVICE";
+export type CartItemType =
+  | "PHYSICAL"
+  | "SERVICE"
+  | "BLOOD_TEST_PACKAGE";
 
 export interface CartItem {
   id: string;
@@ -18,8 +22,12 @@ export interface CartItem {
 interface CartState {
   items: CartItem[];
   addItem: (item: CartItem) => void;
-  removeItem: (id: string) => void;
-  updateQuantity: (id: string, quantity: number) => void;
+  removeItem: (id: string, type: CartItemType) => void;
+  updateQuantity: (
+    id: string,
+    type: CartItemType,
+    quantity: number
+  ) => void;
   clearCart: () => void;
   itemCount: () => number;
   subtotal: () => number;
@@ -32,11 +40,15 @@ export const useCartStore = create<CartState>()(
 
       addItem: (item) => {
         const items = get().items;
-        const existing = items.find((i) => i.id === item.id);
+
+        const existing = items.find(
+          (i) => i.id === item.id && i.type === item.type
+        );
+
         if (existing) {
           set({
             items: items.map((i) =>
-              i.id === item.id
+              i.id === item.id && i.type === item.type
                 ? { ...i, quantity: i.quantity + item.quantity }
                 : i
             ),
@@ -46,28 +58,39 @@ export const useCartStore = create<CartState>()(
         }
       },
 
-      removeItem: (id) => {
-        set({ items: get().items.filter((i) => i.id !== id) });
+      removeItem: (id, type) => {
+        set({
+          items: get().items.filter(
+            (i) => !(i.id === id && i.type === type)
+          ),
+        });
       },
 
-      updateQuantity: (id, quantity) => {
+      updateQuantity: (id, type, quantity) => {
         if (quantity <= 0) {
-          get().removeItem(id);
+          get().removeItem(id, type);
           return;
         }
+
         set({
           items: get().items.map((i) =>
-            i.id === id ? { ...i, quantity } : i
+            i.id === id && i.type === type
+              ? { ...i, quantity }
+              : i
           ),
         });
       },
 
       clearCart: () => set({ items: [] }),
 
-      itemCount: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
+      itemCount: () =>
+        get().items.reduce((sum, i) => sum + i.quantity, 0),
 
       subtotal: () =>
-        get().items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+        get().items.reduce(
+          (sum, i) => sum + i.price * i.quantity,
+          0
+        ),
     }),
     { name: "firxt-cart" }
   )

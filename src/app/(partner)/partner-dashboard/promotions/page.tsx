@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getPartnerContext } from "@/lib/active-partner";
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,10 +10,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export default async function PartnerPromotionsPage() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.partnerId) redirect("/partner-dashboard");
+  const partnerContext = await getPartnerContext();
+  const activePartner = partnerContext?.activePartner;
 
-  const partnerId = session.user.partnerId;
+  if (!activePartner || activePartner.status !== "APPROVED") {
+    redirect("/partner-dashboard");
+  }
+
+  const partnerId = activePartner.id;
 
   const promotions = await prisma.promotion.findMany({
     where: {

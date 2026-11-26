@@ -142,7 +142,10 @@ describe("Email verification POST", () => {
     const emailOptions = mocks.sendMail.mock.calls[0][0];
 
     expect(emailOptions.to).toBe("newuser@example.com");
-    expect(emailOptions.from).toBe("test@example.com");
+    expect(emailOptions.from).toEqual({
+      name: "FiRxt",
+      address: "test@example.com",
+    });
     expect(emailOptions.subject).toBe(
       "Your FiRxt account verification code",
     );

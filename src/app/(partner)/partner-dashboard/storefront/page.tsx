@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,29 +8,42 @@ import { Card } from "@/components/ui/card";
 import { toast } from "@/components/ui/toaster";
 
 export default function StorefrontPage() {
-  const { data: session } = useSession();
+  const [activePartnerId, setActivePartnerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { register, handleSubmit, reset } = useForm();
 
-  useEffect(() => {
-    if (session?.user?.partnerId) {
-      fetch(`/api/partners/${session.user.partnerId}`)
-        .then((r) => r.json())
-        .then((d) => d.partner && reset(d.partner));
-    }
-  }, [session, reset]);
-
   async function onSubmit(data: any) {
-    if (!session?.user?.partnerId) return;
+    if (!activePartnerId) {
+      toast("No active business selected.", "error");
+      return;
+    }
+
     setLoading(true);
-    const res = await fetch(`/api/partners/${session.user.partnerId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    setLoading(false);
-    if (res.ok) toast("Storefront updated!", "success");
-    else toast("Update failed", "error");
+
+    try {
+      const res = await fetch(`/api/partners/${activePartnerId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.error || "Update failed.");
+      }
+
+      toast("Storefront updated!", "success");
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : "Update failed.",
+        "error"
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

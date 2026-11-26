@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { createHash, randomInt } from "node:crypto";
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
@@ -215,21 +217,112 @@ export async function POST(request: Request) {
 
     try {
       await transporter.sendMail({
-        from: fromEmail,
+        from: {
+          name: "FiRxt",
+          address: fromEmail,
+        },
         to: email,
         subject: "Your FiRxt account verification code",
+
+        text: [
+          "Welcome to FiRxt!",
+          "",
+          `Your verification code is: ${code}`,
+          "",
+          "This code expires in 10 minutes.",
+          "If you did not request this code, you can ignore this email.",
+        ].join("\n"),
+
         html: `
-          <div style="font-family: Arial, sans-serif; color: #1f2a44; line-height: 1.6;">
-            <h1 style="margin: 0 0 16px; font-size: 24px;">Verify your email</h1>
-            <p>Use the verification code below to complete your FiRxt account registration.</p>
-            <div style="margin: 24px 0; padding: 16px; background: #f3f4f6; border-radius: 8px; font-size: 28px; font-weight: bold; letter-spacing: 6px; text-align: center;">
-              ${code}
-            </div>
-            <p>This code will expire in 10 minutes.</p>
-            <p>If you did not request this code, you can ignore this email.</p>
-          </div>
+          <!DOCTYPE html>
+          <html lang="en">
+            <body style="margin:0;padding:32px 12px;background:#f3f5f9;font-family:Arial,Helvetica,sans-serif;color:#172033;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                      style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;">
+
+                      <tr>
+                        <td align="center" style="padding:28px 24px;">
+                          <img
+                            src="cid:firxt-logo"
+                            alt="FiRxt Marketplace"
+                            width="160"
+                            style="display:block;width:160px;max-width:100%;height:auto;border:0;"
+                          />
+                        </td>
+                      </tr>
+
+                      <tr>
+                        <td style="padding:8px 32px 32px;">
+                          <h1 style="margin:0 0 16px;text-align:center;font-size:26px;color:#172554;">
+                            Verify your email
+                          </h1>
+
+                          <p style="font-size:15px;line-height:1.7;color:#475569;">
+                            Welcome to FiRxt! Thanks for creating your account.
+                            Please use the verification code below to confirm your email address.
+                          </p>
+
+                          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                            style="background:#eff6ff;border:1px solid #dbeafe;border-radius:10px;">
+                            <tr>
+                              <td align="center" style="padding:24px 12px;">
+                                <p style="margin:0 0 12px;font-size:11px;font-weight:bold;letter-spacing:2px;color:#475569;">
+                                  YOUR VERIFICATION CODE
+                                </p>
+
+                                <p style="margin:0;font-size:34px;font-weight:bold;letter-spacing:8px;color:#1d4ed8;">
+                                  ${code}
+                                </p>
+
+                                <p style="margin:12px 0 0;font-size:13px;color:#64748b;">
+                                  This code expires in 10 minutes.
+                                </p>
+                              </td>
+                            </tr>
+                          </table>
+
+                          <p style="margin:24px 0 12px;font-size:14px;line-height:1.7;color:#475569;">
+                            For your security, do not share this code with anyone.
+                          </p>
+
+                          <p style="font-size:14px;line-height:1.7;color:#475569;">
+                            If you didn't request a FiRxt account verification,
+                            you can safely ignore this email.
+                          </p>
+                        </td>
+                      </tr>
+
+                      <tr>
+                        <td align="center" style="padding:20px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+                          <p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#334155;">
+                            FiRxt Marketplace
+                          </p>
+                          <p style="margin:0;font-size:12px;line-height:1.6;color:#94a3b8;">
+                            Automated account verification email. Please do not reply.
+                          </p>
+                        </td>
+                      </tr>
+
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+          </html>
         `,
+
+        attachments: [
+          {
+            filename: "FiRxt-logo.png",
+            path: path.join(process.cwd(), "public", "FiRxt-logo.png"),
+            cid: "firxt-logo",
+          },
+        ],
       });
+
     } catch (error) {
       console.error("Brevo SMTP verification email failed:", {
         name: error instanceof Error ? error.name : "UnknownError",

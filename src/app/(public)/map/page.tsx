@@ -39,5 +39,14 @@ export default async function MapPage() {
     },
   });
 
-  return <MapPageClient partners={partners} />;
+  const mappablePartners = partners.filter(
+    (partner): partner is typeof partner & {
+      latitude: number;
+      longitude: number;
+    } =>
+      partner.latitude !== null &&
+      partner.longitude !== null
+  );
+
+  return <MapPageClient partners={mappablePartners} />;
 }
