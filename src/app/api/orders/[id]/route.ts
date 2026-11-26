@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getPartnerContext } from "@/lib/active-partner";
 
 export async function GET(
   _req: Request,
@@ -29,12 +30,34 @@ export async function GET(
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   // Access control
-  if (
-    session.user.role !== "ADMIN" &&
-    order.userId !== session.user.id &&
-    order.partnerId !== session.user.partnerId
-  ) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (session.user.role === "ADMIN") {
+    // Admin can access all orders.
+  } else if (session.user.role === "PARTNER") {
+    const partnerContext = await getPartnerContext();
+    const activePartner = partnerContext?.activePartner;
+
+    if (
+      !activePartner ||
+      activePartner.status !== "APPROVED" ||
+      order.partnerId !== activePartner.id
+    ) {
+      return NextResponse.json(
+        { error: "Forbidden" },
+        { status: 403 }
+      );
+    }
+  } else if (session.user.role === "CUSTOMER") {
+    if (order.userId !== session.user.id) {
+      return NextResponse.json(
+        { error: "Forbidden" },
+        { status: 403 }
+      );
+    }
+  } else {
+    return NextResponse.json(
+      { error: "Forbidden" },
+      { status: 403 }
+    );
   }
 
   return NextResponse.json({ order });
@@ -51,11 +74,27 @@ export async function PATCH(
   const order = await prisma.order.findUnique({ where: { id } });
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (
-    session.user.role !== "ADMIN" &&
-    order.partnerId !== session.user.partnerId
-  ) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (session.user.role === "ADMIN") {
+    // Admin can update all orders.
+  } else if (session.user.role === "PARTNER") {
+    const partnerContext = await getPartnerContext();
+    const activePartner = partnerContext?.activePartner;
+
+    if (
+      !activePartner ||
+      activePartner.status !== "APPROVED" ||
+      order.partnerId !== activePartner.id
+    ) {
+      return NextResponse.json(
+        { error: "Forbidden" },
+        { status: 403 }
+      );
+    }
+  } else {
+    return NextResponse.json(
+      { error: "Forbidden" },
+      { status: 403 }
+    );
   }
 
   const body = await req.json();

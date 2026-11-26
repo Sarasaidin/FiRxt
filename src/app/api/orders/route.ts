@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getPartnerContext } from "@/lib/active-partner";
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -14,9 +15,19 @@ export async function GET(req: Request) {
   let where: any = {};
 
   if (session.user.role === "ADMIN") {
-    // Admin sees all
-  } else if (session.user.role === "PARTNER" && session.user.partnerId) {
-    where.partnerId = session.user.partnerId;
+    // Admin sees all orders.
+  } else if (session.user.role === "PARTNER") {
+    const partnerContext = await getPartnerContext();
+    const activePartner = partnerContext?.activePartner;
+
+    if (!activePartner || activePartner.status !== "APPROVED") {
+      return NextResponse.json(
+        { error: "No approved active business selected." },
+        { status: 403 }
+      );
+    }
+
+    where.partnerId = activePartner.id;
   } else {
     where.userId = session.user.id;
   }

@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getPartnerContext } from "@/lib/active-partner";
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,10 +29,14 @@ export async function generateMetadata({ params }: Props) {
 }
 
 export default async function PartnerPromotionDetailPage({ params }: Props) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.partnerId) redirect("/partner-dashboard");
+  const partnerContext = await getPartnerContext();
+  const activePartner = partnerContext?.activePartner;
 
-  const partnerId = session.user.partnerId;
+  if (!activePartner || activePartner.status !== "APPROVED") {
+    redirect("/partner-dashboard");
+  }
+
+  const partnerId = activePartner.id;
   const { id } = await params;
 
   const promotion = await prisma.promotion.findFirst({
@@ -89,6 +92,7 @@ export default async function PartnerPromotionDetailPage({ params }: Props) {
         include: {
           product: { select: { name: true } },
           service: { select: { name: true } },
+          bloodTestPackage: { select: { name: true } },
         },
       },
     },
@@ -266,7 +270,12 @@ export default async function PartnerPromotionDetailPage({ params }: Props) {
                     <div className="space-y-1">
                       {order.items.map((item) => (
                         <p key={item.id} className="text-xs text-gray-600">
-                          {(item.product?.name ?? item.service?.name ?? "Item")} ×{" "}
+                          {(
+                            item.product?.name ??
+                            item.service?.name ??
+                            item.bloodTestPackage?.name ??
+                            "Item"
+                          )} ×{" "}
                           {item.quantity}
                         </p>
                       ))}

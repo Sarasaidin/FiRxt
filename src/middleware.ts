@@ -28,9 +28,7 @@ export async function middleware(req: NextRequest) {
     if (token.role !== "PARTNER" && token.role !== "ADMIN") {
       return NextResponse.redirect(new URL("/", req.url));
     }
-    if (token.role === "PARTNER" && token.partnerStatus !== "APPROVED") {
-      return NextResponse.redirect(new URL("/partner-pending", req.url));
-    }
+
   }
 
   // Protect customer routes

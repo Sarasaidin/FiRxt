@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getPartnerContext } from "@/lib/active-partner";
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,14 +9,24 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export default async function PartnerOrdersPage() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.partnerId) redirect("/partner-dashboard");
+  const partnerContext = await getPartnerContext();
+  const activePartner = partnerContext?.activePartner;
+
+  if (!activePartner || activePartner.status !== "APPROVED") {
+    redirect("/partner-dashboard");
+  }
 
   const orders = await prisma.order.findMany({
-    where: { partnerId: session.user.partnerId },
+    where: { partnerId: activePartner.id },
     include: {
       user: { select: { name: true, email: true } },
-      items: { include: { product: { select: { name: true } }, service: { select: { name: true } } } },
+      items: {
+        include: {
+          product: { select: { name: true } },
+          service: { select: { name: true } },
+          bloodTestPackage: { select: { name: true } },
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -51,7 +60,15 @@ export default async function PartnerOrdersPage() {
                     <p className="text-xs text-gray-400">{o.user.email}</p>
                   </td>
                   <td className="px-4 py-3 text-gray-600 max-w-[180px] truncate">
-                    {o.items.map((i) => i.product?.name ?? i.service?.name).join(", ")}
+                    {o.items
+                      .map(
+                        (i) =>
+                          i.product?.name ??
+                          i.service?.name ??
+                          i.bloodTestPackage?.name
+                      )
+                      .filter(Boolean)
+                      .join(", ")}
                   </td>
                   <td className="px-4 py-3 font-medium">{formatCurrency(o.total)}</td>
                   <td className="px-4 py-3">

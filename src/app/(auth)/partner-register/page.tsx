@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,9 @@ type PartnerRegisterForm = {
 
 export default function PartnerRegisterPage() {
   const router = useRouter();
+  const { data: session, status: sessionStatus } = useSession();
+
+  const isExistingUser = Boolean(session?.user?.id);
 
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -80,11 +84,19 @@ export default function PartnerRegisterPage() {
       longitude: 101.6869,
     },
   });
+  useEffect(() => {
+    if (sessionStatus !== "authenticated" || !session?.user) {
+      return;
+    }
+
+    setValue("name", session.user.name ?? "");
+    setValue("email", session.user.email ?? "");
+    setVerificationMessage("Using your existing FiRxt account.");
+  }, [sessionStatus, session, setValue]);
 
   const typeOptions = [
     { value: "PHARMACY", label: "Community Pharmacy" },
     { value: "CLINIC", label: "Medical Clinic" },
-    { value: "OTHERS", label: "Others" },
   ];
 
   const stateOptions = [
@@ -141,7 +153,7 @@ export default function PartnerRegisterPage() {
     setVerificationLoading(true);
 
     try {
-      const response = await fetch("/api/partners/verify-email", {
+      const response = await fetch("/api/auth/verify-email", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -184,7 +196,7 @@ export default function PartnerRegisterPage() {
     setVerificationLoading(true);
 
     try {
-      const response = await fetch("/api/partners/verify-email", {
+      const response = await fetch("/api/auth/verify-email", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -249,6 +261,16 @@ export default function PartnerRegisterPage() {
     }
   }
 
+  if (sessionStatus === "loading") {
+    return (
+      <Card className="w-full max-w-3xl p-6">
+        <p className="text-sm text-gray-600">
+          Checking your account...
+        </p>
+      </Card>
+    );
+  }
+
   return (
     <Card className="w-full max-w-3xl p-6">
       {/* Steps indicator */}
@@ -298,6 +320,8 @@ export default function PartnerRegisterPage() {
             <h2 className="text-xl font-bold text-brand-navy">
               Account Details
             </h2>
+              {!isExistingUser ? (
+                <>
 
             <Input
               {...register("name", {
@@ -406,22 +430,43 @@ export default function PartnerRegisterPage() {
               error={errors.confirmPassword?.message}
               required
             />
+              </>
+            ) : (
+              <div className="rounded-lg border border-brand-teal bg-brand-teal/10 p-4 text-sm">
+                <p className="mb-2 font-semibold text-brand-navy">
+                  Existing FiRxt Account
+                </p>
+                <p>
+                  <strong>Name:</strong> {session?.user?.name}
+                </p>
+                <p>
+                  <strong>Email:</strong> {session?.user?.email}
+                </p>
+                <p className="mt-2 text-gray-600">
+                  Your existing account will be used for this business registration.
+                  You do not need to create another account.
+                </p>
+              </div>
+            )}
 
             <Button
               type="button"
               onClick={() =>
                 goToNextStep(
-                  [
-                    "name",
-                    "email",
-                    "countryCode",
-                    "phone",
-                    "password",
-                    "confirmPassword",
-                  ],
+                  isExistingUser
+                    ? []
+                    : [
+                        "name",
+                        "email",
+                        "countryCode",
+                        "phone",
+                        "password",
+                        "confirmPassword",
+                      ],
                   1
                 )
               }
+
               className="mt-2"
             >
               Next
@@ -473,18 +518,7 @@ export default function PartnerRegisterPage() {
               required
             />
 
-            {watch("type") === "OTHERS" && (
-              <Input
-                {...register("otherBusinessType", {
-                  required: "Please specify your business type",
-                })}
-                id="otherBusinessType"
-                label="Please specify"
-                placeholder="Enter your business type"
-                error={errors.otherBusinessType?.message}
-                required
-              />
-            )}
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-[140px_1fr]">
 
             <Input
@@ -738,10 +772,11 @@ export default function PartnerRegisterPage() {
               admin team. You&apos;ll receive an email once approved.
             </div>
 
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <h3 className="mb-2 text-sm font-semibold text-brand-navy">
-                Email Verification
-              </h3>
+            {!isExistingUser && (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <h3 className="mb-2 text-sm font-semibold text-brand-navy">
+                  Email Verification
+                </h3>
 
               <p className="mb-3 text-sm text-gray-600">
                 Before submitting your application, please verify your email address using a
@@ -795,9 +830,12 @@ export default function PartnerRegisterPage() {
               )}
 
               {verificationMessage && (
-                <p className="mt-3 text-sm text-brand-navy">{verificationMessage}</p>
+                <p className="mt-3 text-sm text-brand-navy">
+                  {verificationMessage}
+                </p>
               )}
-            </div>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <Button
@@ -808,7 +846,11 @@ export default function PartnerRegisterPage() {
                 Back
               </Button>
 
-              <Button type="submit" loading={loading} disabled={!emailVerified}>
+              <Button
+                type="submit"
+                loading={loading}
+                disabled={!isExistingUser && !emailVerified}
+              >
                 Submit Application
               </Button>
             </div>

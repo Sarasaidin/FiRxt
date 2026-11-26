@@ -20,6 +20,12 @@ enum PartnerStatus {
   SUSPENDED
 }
 
+enum LocationSource {
+  GEOCODED
+  MANUAL_PIN
+  NOT_SET
+}
+
 enum PartnerType {
   PHARMACY
   CLINIC
@@ -28,6 +34,7 @@ enum PartnerType {
 enum ProductType {
   PHYSICAL
   SERVICE
+  BLOOD_TEST_PACKAGE
 }
 
 enum OrderStatus {
@@ -66,24 +73,54 @@ enum PromotionStatus {
   CANCELLED
 }
 
+enum ClinicVisitStatus {
+  REGISTERED
+  CHECKED_IN
+  SAMPLE_COLLECTED
+  SAMPLE_SENT_TO_LAB
+  LAB_REPORT_RECEIVED
+  AI_REPORT_READY
+  CONSULTATION_COMPLETED
+  CANCELLED
+}
+
+enum PaymentRecoveryStatus {
+  PENDING
+  REFUNDING
+  REFUNDED
+  MANUAL_REVIEW
+}
+
+enum BloodTestPackageApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum BloodTestPackageVisibility {
+  PRIVATE
+  SHARED
+}
+
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  passwordHash  String?
-  role          UserRole  @default(CUSTOMER)
-  phone         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  emailVerified  DateTime?
+  image          String?
+  passwordHash   String?
+  role           UserRole  @default(CUSTOMER)
+  phone          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   accounts     Account[]
   sessions     Session[]
   orders       Order[]
   reviews      Review[]
   behaviorLogs BehaviorLog[]
-  partner      Partner?
+  partners     Partner[]
   addresses    Address[]
 
   @@map("users")
@@ -149,28 +186,122 @@ model Address {
   @@map("addresses")
 }
 
-model Partner {
-  id          String        @id @default(cuid())
-  userId      String        @unique
-  slug        String        @unique
+model BusinessType {
+  id          String   @id @default(cuid())
+  code        String   @unique
   name        String
-  type        PartnerType
-  status      PartnerStatus @default(PENDING)
-  description String?       @db.Text
-  logoUrl     String?
-  bannerUrl   String?
-  phone       String?
-  email       String?
-  website     String?
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  addressLine1 String
-  addressLine2 String?
-  city         String
-  state        String
-  postcode     String
-  country      String  @default("MY")
-  latitude     Float
-  longitude    Float
+  partners Partner[]
+
+  @@map("business_types")
+}
+
+model LabTest {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?  @db.Text
+  category    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  packageLinks BloodTestPackageTest[]
+
+  @@map("lab_tests")
+}
+
+model BloodTestPackage {
+  id                      String                         @id @default(cuid())
+  name                    String
+  description             String?                        @db.Text
+  price                   Int
+  originalPrice           Int?
+  preparationInstructions String?                        @db.Text
+  sampleType              String?
+  turnaroundDays          Int?
+  ownerPartnerId          String?
+  approvalStatus          BloodTestPackageApprovalStatus @default(PENDING)
+  visibility              BloodTestPackageVisibility     @default(PRIVATE)
+  isActive                Boolean                        @default(true)
+  reviewedBy              String?
+  reviewedAt              DateTime?
+  rejectionReason         String?                        @db.Text
+  createdAt               DateTime                       @default(now())
+  updatedAt               DateTime                       @updatedAt
+
+  ownerPartner Partner? @relation("OwnedBloodTestPackages", fields: [ownerPartnerId], references: [id], onDelete: Restrict)
+  packageTests BloodTestPackageTest[]
+  clinicLinks  ClinicPackage[]
+  orderItems   OrderItem[]
+
+  @@index([ownerPartnerId])
+  @@index([approvalStatus, visibility, isActive])
+  @@map("blood_test_packages")
+}
+
+model BloodTestPackageTest {
+  id        String  @id @default(cuid())
+  packageId String
+  labTestId String
+  sortOrder Int     @default(0)
+  notes     String?
+
+  package BloodTestPackage @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  labTest LabTest          @relation(fields: [labTestId], references: [id], onDelete: Restrict)
+
+  @@unique([packageId, labTestId])
+  @@index([labTestId])
+  @@map("blood_test_package_tests")
+}
+
+model ClinicPackage {
+  id            String   @id @default(cuid())
+  clinicId      String
+  packageId     String
+  priceOverride Int?
+  isAvailable   Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  clinic  Partner          @relation("ClinicBloodTestPackages", fields: [clinicId], references: [id], onDelete: Restrict)
+  package BloodTestPackage @relation(fields: [packageId], references: [id], onDelete: Restrict)
+
+  @@unique([clinicId, packageId])
+  @@index([packageId])
+  @@map("clinic_packages")
+}
+
+model Partner {
+  id                         String        @id @default(cuid())
+  userId                     String
+  slug                       String        @unique
+  name                       String
+  businessTypeId             String?
+  businessRegistrationNumber String?       @unique
+  businessType               BusinessType? @relation(fields: [businessTypeId], references: [id])
+  type                       PartnerType
+  status                     PartnerStatus @default(PENDING)
+  description                String?       @db.Text
+  logoUrl                    String?
+  bannerUrl                  String?
+  phone                      String?
+  email                      String?
+  website                    String?
+
+  addressLine1   String
+  addressLine2   String?
+  city           String
+  state          String
+  postcode       String
+  country        String         @default("MY")
+  latitude       Float?
+  longitude      Float?
+  locationSource LocationSource @default(NOT_SET)
 
   stripeAccountId String?
   operatingHours  Json?
@@ -182,15 +313,19 @@ model Partner {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  user       User              @relation(fields: [userId], references: [id])
-  products   Product[]
-  services   Service[]
-  orders     Order[]
-  reviews    Review[]
-  promotions Promotion[]
-  promotionLinks PromotionPartner[]
-  analytics  PartnerAnalytic[]
+  user                   User               @relation(fields: [userId], references: [id])
+  products               Product[]
+  services               Service[]
+  orders                 Order[]
+  reviews                Review[]
+  promotions             Promotion[]
+  promotionLinks         PromotionPartner[]
+  analytics              PartnerAnalytic[]
+  ownedBloodTestPackages BloodTestPackage[] @relation("OwnedBloodTestPackages")
+  clinicPackages         ClinicPackage[]    @relation("ClinicBloodTestPackages")
 
+  @@index([userId])
+  @@index([businessTypeId])
   @@map("partners")
 }
 
@@ -264,18 +399,18 @@ model Service {
 }
 
 model Order {
-  id            String        @id @default(cuid())
-  orderNumber   String        @unique
-  userId        String
-  partnerId     String
-  addressId     String?
-  status OrderStatus @default(PENDING_PAYMENT)
-  paymentStatus PaymentStatus @default(PENDING)
-  subtotal      Int
-  discountAmount Int          @default(0)
-  deliveryFee   Int           @default(0)
-  tax           Int           @default(0)
-  total         Int
+  id             String        @id @default(cuid())
+  orderNumber    String        @unique
+  userId         String
+  partnerId      String
+  addressId      String?
+  status         OrderStatus   @default(PENDING_PAYMENT)
+  paymentStatus  PaymentStatus @default(PENDING)
+  subtotal       Int
+  discountAmount Int           @default(0)
+  deliveryFee    Int           @default(0)
+  tax            Int           @default(0)
+  total          Int
 
   stripePaymentIntentId String? @unique
   stripeSessionId       String? @unique
@@ -285,16 +420,17 @@ model Order {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  user      User                 @relation(fields: [userId], references: [id])
-  partner   Partner              @relation(fields: [partnerId], references: [id])
-  address   Address?             @relation(fields: [addressId], references: [id])
-  promotion Promotion?           @relation(fields: [promotionId], references: [id])
-  items     OrderItem[]
-  history   OrderStatusHistory[]
+  user        User                 @relation(fields: [userId], references: [id])
+  partner     Partner              @relation(fields: [partnerId], references: [id])
+  address     Address?             @relation(fields: [addressId], references: [id])
+  promotion   Promotion?           @relation(fields: [promotionId], references: [id])
+  items       OrderItem[]
+  history     OrderStatusHistory[]
+  clinicVisit ClinicVisit?
 
   fulfillmentType FulfillmentType?
-  pickupAt DateTime?
-  visitAt DateTime?
+  pickupAt        DateTime?
+  visitAt         DateTime?
 
   @@map("orders")
 }
@@ -309,10 +445,17 @@ model OrderItem {
   totalPrice Int
   itemType   ProductType
 
-  order   Order    @relation(fields: [orderId], references: [id])
-  product Product? @relation(fields: [productId], references: [id])
-  service Service? @relation(fields: [serviceId], references: [id])
+  bloodTestPackageId              String?
+  packageNameSnapshot             String?
+  includedTestsSnapshot           Json?
+  preparationInstructionsSnapshot String? @db.Text
 
+  order            Order             @relation(fields: [orderId], references: [id])
+  product          Product?          @relation(fields: [productId], references: [id], onDelete: Restrict)
+  service          Service?          @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  bloodTestPackage BloodTestPackage? @relation(fields: [bloodTestPackageId], references: [id], onDelete: Restrict)
+
+  @@index([bloodTestPackageId])
   @@map("order_items")
 }
 
@@ -327,6 +470,26 @@ model OrderStatusHistory {
   order Order @relation(fields: [orderId], references: [id])
 
   @@map("order_status_history")
+}
+
+model ClinicVisit {
+  id                      String            @id @default(cuid())
+  visitNumber             String            @unique
+  orderId                 String            @unique
+  status                  ClinicVisitStatus @default(REGISTERED)
+  checkedInAt             DateTime?
+  sampleCollectedAt       DateTime?
+  sampleSentToLabAt       DateTime?
+  labReportReceivedAt     DateTime?
+  aiReportReadyAt         DateTime?
+  consultationCompletedAt DateTime?
+  notes                   String?           @db.Text
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("clinic_visits")
 }
 
 model Promotion {
@@ -348,10 +511,10 @@ model Promotion {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
-  partner Partner?        @relation(fields: [partnerId], references: [id])
-  items   PromotionItem[]
+  partner               Partner?           @relation(fields: [partnerId], references: [id])
+  items                 PromotionItem[]
   participatingPartners PromotionPartner[]
-  orders  Order[]
+  orders                Order[]
 
   @@map("promotions")
 }
@@ -441,15 +604,48 @@ model SiteConfig {
   @@map("site_config")
 }
 
-
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+model EmailVerification {
+  id         String    @id @default(cuid())
+  email      String    @unique
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  verifiedAt DateTime?
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([expiresAt])
+  @@map("email_verifications")
+}
+
+model PaymentRecovery {
+  id                    String                @id @default(cuid())
+  stripeSessionId       String                @unique
+  stripePaymentIntentId String?
+  stripeRefundId        String?               @unique
+  amount                Int
+  currency              String                @default("myr")
+  reason                String
+  status                PaymentRecoveryStatus @default(PENDING)
+  attempts              Int                   @default(0)
+  lastError             String?               @db.Text
+  claimToken            String?
+  claimExpiresAt        DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  @@map("payment_recoveries")
 }

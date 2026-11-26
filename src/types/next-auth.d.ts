@@ -1,5 +1,19 @@
-import type { PartnerStatus, UserRole } from "@prisma/client";
+
+import type {
+  PartnerStatus,
+  PartnerType,
+  UserRole,
+} from "@prisma/client";
+import type { DefaultSession } from "next-auth";
 import "next-auth";
+
+export interface SessionPartner {
+  id: string;
+  name: string;
+  slug: string;
+  type: PartnerType;
+  status: PartnerStatus;
+}
 
 declare module "next-auth" {
   interface Session {
@@ -8,6 +22,7 @@ declare module "next-auth" {
       role: UserRole;
       partnerId?: string;
       partnerStatus?: PartnerStatus;
+      partners: SessionPartner[];
     } & DefaultSession["user"];
   }
 
@@ -15,6 +30,7 @@ declare module "next-auth" {
     role: UserRole;
     partnerId?: string;
     partnerStatus?: PartnerStatus;
+    partners?: SessionPartner[];
   }
 }
 
@@ -24,5 +40,6 @@ declare module "next-auth/jwt" {
     role: UserRole;
     partnerId?: string;
     partnerStatus?: PartnerStatus;
+    partners?: SessionPartner[];
   }
 }

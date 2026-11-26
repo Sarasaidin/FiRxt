@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getPartnerContext } from "@/lib/active-partner";
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
@@ -34,10 +33,14 @@ function formatStatusLabel(status: string) {
 }
 
 export default async function PartnerDashboardPage() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.partnerId) redirect("/");
+  const partnerContext = await getPartnerContext();
+  const activePartner = partnerContext?.activePartner;
 
-  const partnerId = session.user.partnerId;
+  if (!activePartner || activePartner.status !== "APPROVED") {
+    redirect("/");
+  }
+
+  const partnerId = activePartner.id;
   const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
   const [partner, orders30d, productCount, serviceCount] = await Promise.all([
@@ -78,6 +81,7 @@ export default async function PartnerDashboardPage() {
         include: {
           product: { select: { name: true } },
           service: { select: { name: true } },
+          bloodTestPackage: { select: { name: true } },
         },
       },
     },
@@ -88,7 +92,7 @@ export default async function PartnerDashboardPage() {
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold text-brand-navy">
-        Welcome, {partner?.name}
+        Welcome, {activePartner.name}
       </h1>
 
       {/* KPI Cards */}
@@ -236,7 +240,12 @@ export default async function PartnerDashboardPage() {
                     <p className="text-sm font-medium">#{order.orderNumber}</p>
                     <p className="text-xs text-gray-500">
                       {order.items
-                        .map((item) => item.product?.name ?? item.service?.name)
+                        .map(
+                          (item) =>
+                            item.product?.name ??
+                            item.service?.name ??
+                            item.bloodTestPackage?.name
+                        )
                         .filter(Boolean)
                         .join(", ")}
                     </p>

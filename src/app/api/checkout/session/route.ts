@@ -35,6 +35,7 @@ export async function POST(req: Request) {
   let partnerId: string | null = null;
   let subtotal = 0;
   let hasServiceItem = false;
+  let hasBloodTestPackageItem = false;
 
   for (const item of items) {
     if (item.type === "PHYSICAL") {
@@ -116,6 +117,132 @@ export async function POST(req: Request) {
 
       subtotal += service.price * item.quantity;
     }
+
+    if (item.type === "BLOOD_TEST_PACKAGE") {
+      // The clinic is the merchant for this customer order.
+      const clinic = await prisma.partner.findUnique({
+        where: { id: item.partnerId },
+      });
+
+      if (
+        !clinic ||
+        clinic.type !== "CLINIC" ||
+        clinic.status !== "APPROVED"
+      ) {
+        return NextResponse.json(
+          { error: "This clinic is unavailable for checkout." },
+          { status: 400 }
+        );
+      }
+
+      const bloodTestPackage =
+        await prisma.bloodTestPackage.findUnique({
+          where: { id: item.id },
+          include: {
+            ownerPartner: true,
+          },
+        });
+
+      if (
+        !bloodTestPackage ||
+        !bloodTestPackage.isActive ||
+        bloodTestPackage.approvalStatus !== "APPROVED"
+      ) {
+        return NextResponse.json(
+          { error: "This blood-test package is unavailable." },
+          { status: 400 }
+        );
+      }
+
+// Shared packages require an active, approved owner clinic.
+if (
+  bloodTestPackage.visibility === "SHARED" &&
+  (
+    !bloodTestPackage.ownerPartner ||
+    bloodTestPackage.ownerPartner.type !== "CLINIC" ||
+    bloodTestPackage.ownerPartner.status !== "APPROVED"
+  )
+) {
+  return NextResponse.json(
+    {
+      error:
+        "This shared package is unavailable because its owner clinic is not approved.",
+    },
+    { status: 400 }
+  );
+}
+
+      // Private packages can only be sold by their owner clinic.
+      if (
+        bloodTestPackage.visibility === "PRIVATE" &&
+        bloodTestPackage.ownerPartnerId !== clinic.id
+      ) {
+        return NextResponse.json(
+          { error: "This package is not available through this clinic." },
+          { status: 400 }
+        );
+      }
+
+      const clinicOffer = await prisma.clinicPackage.findUnique({
+        where: {
+          clinicId_packageId: {
+            clinicId: clinic.id,
+            packageId: bloodTestPackage.id,
+          },
+        },
+      });
+
+      if (!clinicOffer || !clinicOffer.isAvailable) {
+        return NextResponse.json(
+          { error: "This package is not currently offered by this clinic." },
+          { status: 400 }
+        );
+      }
+
+      if (
+        partnerId &&
+        partnerId !== clinic.id
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Please checkout items from one merchant at a time.",
+          },
+          { status: 400 }
+        );
+      }
+
+      partnerId = clinic.id;
+      hasBloodTestPackageItem = true;
+
+      const packagePrice =
+        clinicOffer.priceOverride ?? bloodTestPackage.price;
+
+      if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+        return NextResponse.json(
+          { error: "Invalid package quantity." },
+          { status: 400 }
+        );
+      }
+
+      lineItems.push({
+        price_data: {
+          currency: "myr",
+          product_data: {
+            name: bloodTestPackage.name,
+            metadata: {
+              bloodTestPackageId: bloodTestPackage.id,
+              type: "BLOOD_TEST_PACKAGE",
+            },
+          },
+          unit_amount: packagePrice,
+        },
+        quantity: item.quantity,
+      });
+
+      subtotal += packagePrice * item.quantity;
+    }
+
   }
 
   if (lineItems.length === 0) {

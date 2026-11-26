@@ -14,7 +14,7 @@ const categories = [
   {
     label: "Blood Tests",
     icon: "🩸",
-    href: "/search?q=blood%20test",
+    href: "/blood-tests",
   },
   {
     label: "Vaccinations",

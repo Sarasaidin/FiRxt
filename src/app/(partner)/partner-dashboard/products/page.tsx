@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getPartnerContext } from "@/lib/active-partner";
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,11 +12,15 @@ import { Plus } from "lucide-react";
 export const metadata = { title: "Products" };
 
 export default async function PartnerProductsPage() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.partnerId) redirect("/partner-dashboard");
+  const partnerContext = await getPartnerContext();
+  const activePartner = partnerContext?.activePartner;
+
+  if (!activePartner || activePartner.status !== "APPROVED") {
+    redirect("/partner-dashboard");
+  }
 
   const products = await prisma.product.findMany({
-    where: { partnerId: session.user.partnerId },
+    where: { partnerId: activePartner.id },
     orderBy: { createdAt: "desc" },
     include: { category: { select: { name: true } } },
   });

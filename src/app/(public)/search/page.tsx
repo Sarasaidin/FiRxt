@@ -219,8 +219,8 @@ export default async function SearchPage({ searchParams }: Props) {
     },
     {
       label: "Blood Tests",
-      href: "/search?q=blood%20test",
-      active: normalizedQuery === "blood test",
+      href: "/blood-tests",
+      active: false,
     },
     {
       label: "Vaccinations",
